@@ -21,8 +21,6 @@ export class UiStore {
         this.typingSignal.set(false);
         this.turnEndedSignal.set(true);
         return;
-      default:
-        return;
     }
   }
 }

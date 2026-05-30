@@ -4,6 +4,8 @@ import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { LlmService } from '../llm/llm.service';
 
+const MAX_SPEAKERS_PER_ROUND = 5;
+
 @Injectable({ providedIn: 'root' })
 export class DiscussionEngineService {
   constructor(
@@ -13,7 +15,9 @@ export class DiscussionEngineService {
   ) {}
 
   async run(roomId: string, round: number, speakers: string[]): Promise<void> {
-    for (const speakerId of speakers.slice(0, Math.max(1, Math.min(round, 5)))) {
+    const speakerCount = Math.max(1, Math.min(round, MAX_SPEAKERS_PER_ROUND));
+
+    for (const speakerId of speakers.slice(0, speakerCount)) {
       const character = this.characterStore.getCharacter(speakerId);
       if (!character) {
         continue;

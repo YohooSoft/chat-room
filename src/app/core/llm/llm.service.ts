@@ -24,9 +24,9 @@ export class LlmService {
   ]);
 
   async chat(providerName: string, request: ChatRequest): Promise<ChatResponse> {
-    const provider = this.providers.get(providerName) ?? this.providers.get('openai');
+    const provider = this.providers.get(providerName);
     if (!provider) {
-      throw new Error('No LLM provider configured.');
+      throw new Error(`Unknown LLM provider: ${providerName}`);
     }
 
     return provider.chat(request);

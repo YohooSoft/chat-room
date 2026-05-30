@@ -20,10 +20,15 @@ export class ChatComponent {
   readonly uiStore = inject(UiStore);
 
   private readonly eventBus = inject(EventBusService);
-  private readonly _orchestrator = inject(ChatOrchestratorService);
+  private readonly orchestrator = inject(ChatOrchestratorService);
 
   readonly input = signal('');
+  readonly typingLabel = '系统';
   readonly currentMessages = computed(() => this.chatStore.messagesForRoom(this.roomStore.activeRoomId()));
+
+  constructor() {
+    this.orchestrator.init();
+  }
 
   submit(): void {
     const content = this.input().trim();
@@ -41,8 +46,7 @@ export class ChatComponent {
     this.input.set('');
   }
 
-  trackById(index: number, message: { id: string }): string {
-    this._orchestrator;
-    return `${index}-${message.id}`;
+  trackById(_index: number, message: { id: string }): string {
+    return message.id;
   }
 }

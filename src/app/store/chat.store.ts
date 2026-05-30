@@ -9,7 +9,7 @@ export class ChatStore {
 
   readonly messages = this.messagesSignal.asReadonly();
   readonly visibleMessages = computed(() =>
-    this.messagesSignal().toSorted((a, b) => a.createdAt - b.createdAt)
+    [...this.messagesSignal()].sort((a: ChatMessage, b: ChatMessage) => a.createdAt - b.createdAt)
   );
 
   addUserMessage(roomId: string, content: string): ChatMessage {
@@ -41,6 +41,6 @@ export class ChatStore {
   }
 
   messagesForRoom(roomId: string): ChatMessage[] {
-    return this.visibleMessages().filter((message) => message.roomId === roomId);
+    return this.visibleMessages().filter((message: ChatMessage) => message.roomId === roomId);
   }
 }
