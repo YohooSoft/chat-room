@@ -9,12 +9,20 @@ import { ExecutionEngineService } from './execution-engine.service';
 @Injectable({ providedIn: 'root' })
 export class ChatOrchestratorService {
   private readonly destroyRef = inject(DestroyRef);
+  private initialized = false;
 
   constructor(
     private readonly eventBusService: EventBusService,
     private readonly haikuService: HaikuService,
     private readonly executionEngineService: ExecutionEngineService
-  ) {
+  ) {}
+
+  init(): void {
+    if (this.initialized) {
+      return;
+    }
+
+    this.initialized = true;
     this.listen();
   }
 

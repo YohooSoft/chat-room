@@ -4,6 +4,8 @@ import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { Action, ExecutionPlan } from '../../shared/types/chat.types';
 
+const MIN_CONTENT_LENGTH_FOR_MEMORY = 20;
+
 @Injectable({ providedIn: 'root' })
 export class HaikuService {
   constructor(
@@ -31,7 +33,7 @@ export class HaikuService {
       });
     }
 
-    if (userContent.length > 20) {
+    if (userContent.length > MIN_CONTENT_LENGTH_FOR_MEMORY) {
       actions.push({
         type: 'write_memory',
         scope: 'room',

@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
 
-import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { UiStore } from '../../store/ui.store';
 import { ExecutionPlan } from '../../shared/types/chat.types';
@@ -15,8 +14,7 @@ export class ExecutionEngineService {
     private readonly memoryService: MemoryService,
     private readonly discussionEngine: DiscussionEngineService,
     private readonly uiStore: UiStore,
-    private readonly chatStore: ChatStore,
-    private readonly characterStore: CharacterStore
+    private readonly chatStore: ChatStore
   ) {}
 
   async execute(plan: ExecutionPlan): Promise<void> {
@@ -29,8 +27,7 @@ export class ExecutionEngineService {
             temperature: action.temperature
           });
 
-          const characterName = this.characterStore.getCharacter(action.characterId)?.name ?? action.characterId;
-          this.chatStore.addAiMessage(plan.roomId, action.characterId, `${characterName}: ${response.content}`);
+          this.chatStore.addAiMessage(plan.roomId, action.characterId, response.content);
           break;
         }
         case 'write_memory':
