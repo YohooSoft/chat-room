@@ -1,0 +1,12 @@
+.main-nav {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border-bottom: 1px solid #ececec;
+}
+
+.main-nav a {
+  text-decoration: none;
+  color: #1565c0;
+  font-weight: 600;
+}
