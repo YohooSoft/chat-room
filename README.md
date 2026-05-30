@@ -1,6 +1,9 @@
 # AI 多角色聊天室（ChatRoom / AI Drama Engine）
 
-一个基于 Angular 的前端多角色 AI 聊天室原型，用 Haiku 调度生成 ExecutionPlan，再由 ExecutionEngine 执行模型调用、讨论与记忆写入。当前版本聚焦于运行流与核心引擎骨架，便于继续扩展成完整产品。
+一个基于 Angular 的前端多角色 AI 聊天室原型。
+项目名为 ChatRoom，系统代号为 AI Drama Engine。
+用 Haiku 调度生成 ExecutionPlan，再由 ExecutionEngine 执行模型调用、讨论与记忆写入。
+当前版本聚焦于运行流与核心引擎骨架，便于继续扩展成完整产品。
 
 English: A front-end multi-character AI chatroom prototype built with Angular.
 
@@ -78,7 +81,7 @@ src/app/
 
 ## 数据存储（localStorage）
 
-默认使用 `ai-drama-engine` 作为 key（与 “AI Drama Engine” 命名一致），结构如下：
+默认使用 `ai-drama-engine` 作为 key（与系统代号 “AI Drama Engine” 命名一致），结构如下：
 
 ```json
 {
