@@ -1,59 +1,105 @@
-# ChatRoom
+# AI 多角色聊天室（ChatRoom / AI Drama Engine）
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.26.
+一个基于 Angular 的前端多角色 AI 聊天室原型，用 Haiku 调度生成 ExecutionPlan，再由 ExecutionEngine 执行模型调用、讨论与记忆写入。当前版本聚焦于运行流与核心引擎骨架，便于继续扩展成完整产品。
 
-## Development server
+## 当前实现
 
-To start a local development server, run:
+- 多角色聊天基础流：用户输入 → Haiku 调度 → ExecutionPlan → ExecutionEngine
+- 讨论引擎（DiscussionEngine）支持按轮次触发多角色发言
+- LLM Provider 统一接口（当前为 Mock Provider，便于替换真实 API）
+- 记忆系统：写入 localStorage，按房间/角色分组
+- 默认房间与角色（导演 AI / 评论家 AI）
+- 角色/房间/记忆/设置页面为占位界面，便于后续补齐
 
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## 快速开始
 
 ```bash
-ng generate component component-name
+npm install
+npm start
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+启动后访问：`http://localhost:4200/`
+
+## 常用脚本
 
 ```bash
-ng generate --help
+npm run build
+npm test -- --watch=false --browsers=ChromeHeadless
+npm run watch
 ```
 
-## Building
+## 架构与运行流
 
-To build the project run:
-
-```bash
-ng build
+```text
+User Input
+   ↓
+ChatComponent
+   ↓
+EventBus.emit(UserMessage)
+   ↓
+HaikuService
+   ↓
+ExecutionPlan
+   ↓
+ExecutionEngine
+   ↓
+LLM Provider / DiscussionEngine / MemoryService
+   ↓
+ChatStore → UI Render → localStorage
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## 目录结构（核心）
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
-
-```bash
-ng test
+```text
+src/app/
+├── core/
+│   ├── engine/        # ExecutionEngine + Orchestrator
+│   ├── haiku/         # 调度器，生成 ExecutionPlan
+│   ├── llm/           # Provider 统一适配层
+│   ├── discussion/    # 多轮讨论引擎
+│   ├── memory/        # 记忆写入
+│   ├── event-bus/     # 事件总线
+│   └── storage/       # localStorage 封装
+├── store/             # Signal 状态层（room/chat/character/ui）
+├── features/          # Chat/Room/Character/Memory/Settings 页面
+└── shared/            # 类型与工具函数
 ```
 
-## Running end-to-end tests
+## 核心协议（简化）
 
-For end-to-end (e2e) testing, run:
+- **ExecutionPlan**：`{ roomId, actions[] }`
+- **Action 类型**：
+  - `call_model`：调用指定 Provider 与 Model
+  - `write_memory`：写入记忆（room/character）
+  - `trigger_discussion`：触发讨论轮次
+  - `ui_event`：控制 UI 状态（typing/end_turn）
 
-```bash
-ng e2e
+## 数据存储（localStorage）
+
+默认使用 `ai-drama-engine` 作为 key，结构如下：
+
+```json
+{
+  "rooms": {},
+  "characters": {},
+  "messages": {},
+  "memories": {
+    "room": {},
+    "character": {}
+  },
+  "user": {
+    "name": "",
+    "profile": {},
+    "preferences": {}
+  }
+}
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+## 调试与可视化约定
 
-## Additional Resources
+- **Haiku 的操作记录仅输出在浏览器调试（DevTools/Console）中，不会进入消息流，也不会在页面 UI 显示。**
+- UI 只渲染用户与 AI 的对话消息，不展示系统内部动作细节。
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## 设计蓝图
+
+更完整的设计规划与目标形态见：`README.blueprint.md`。
