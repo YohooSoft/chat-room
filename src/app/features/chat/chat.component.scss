@@ -174,3 +174,81 @@
 .chat-input button {
   min-width: 5rem;
 }
+
+/* ── Markdown rendered content ─────────────────────────────── */
+.message-body {
+  word-break: break-word;
+}
+
+.message-body p {
+  margin: 0 0 0.4rem;
+}
+
+.message-body p:last-child {
+  margin-bottom: 0;
+}
+
+.message-body h1,
+.message-body h2,
+.message-body h3,
+.message-body h4 {
+  margin: 0.5rem 0 0.3rem;
+  line-height: 1.3;
+}
+
+.message-body h1 { font-size: 1.3rem; }
+.message-body h2 { font-size: 1.15rem; }
+.message-body h3 { font-size: 1.05rem; }
+
+.message-body ul,
+.message-body ol {
+  margin: 0.25rem 0;
+  padding-left: 1.4rem;
+}
+
+.message-body li {
+  margin-bottom: 0.15rem;
+}
+
+.message-body code {
+  background: #eceff1;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+}
+
+.message-body pre {
+  background: #263238;
+  color: #eceff1;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.4rem 0;
+}
+
+.message-body pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 0.85em;
+}
+
+.message-body a {
+  color: #1565c0;
+  text-decoration: underline;
+}
+
+.message-body strong {
+  font-weight: 700;
+}
+
+.message-body em {
+  font-style: italic;
+}
+
+.message-body br {
+  display: block;
+  content: '';
+  margin-top: 0.3rem;
+}

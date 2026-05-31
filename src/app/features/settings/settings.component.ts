@@ -123,7 +123,7 @@ export class SettingsComponent {
     this.savedMessage.set(`${SAVE_MESSAGE_PREFIX} ${new Date().toLocaleTimeString('zh-CN')}`);
   }
 
-  // Model management methods
+  // Model management methods (auto-save on every change)
   addModel(): void {
     const modelName = this.newModelName().trim();
     if (!modelName) {
@@ -154,12 +154,33 @@ export class SettingsComponent {
     this.newModelApiKey.set('');
     this.newModelBaseUrl.set('');
     this.newModelIsGenAI.set(false);
+    this.persistModels(); // auto-save immediately
   }
 
   removeModel(provider: string, modelName: string): void {
     this.customModels.update((models) =>
       models.filter((m) => !(m.provider === provider && m.model === modelName))
     );
+    this.persistModels(); // auto-save immediately
+  }
+
+  /**
+   * Persist only the customModels to localStorage without touching
+   * other form fields (user name, default provider, etc.).
+   */
+  private persistModels(): void {
+    const state = this.storageService.read();
+    const nextState: AppStorageState = {
+      ...state,
+      user: {
+        ...state.user,
+        preferences: {
+          ...(state.user.preferences as Record<string, unknown>),
+          customModels: this.customModels()
+        }
+      }
+    };
+    this.storageService.write(nextState);
   }
 
   updateTemperature(value: string): void {

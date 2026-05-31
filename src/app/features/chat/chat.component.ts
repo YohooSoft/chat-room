@@ -2,6 +2,8 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { MarkdownPipe } from '../../shared/utils/markdown.pipe';
+
 import { EventBusService } from '../../core/event-bus/event-bus.service';
 import { ChatOrchestratorService } from '../../core/engine/chat-orchestrator.service';
 import { LlmService } from '../../core/llm/llm.service';
@@ -13,7 +15,7 @@ import { UiStore } from '../../store/ui.store';
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, MarkdownPipe],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
