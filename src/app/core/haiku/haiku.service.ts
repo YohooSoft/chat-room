@@ -64,12 +64,12 @@ export class HaikuService {
 
     // Log system character activity to console only
     for (const sc of systemCharacters) {
-      console.info(`[Haiku] 系统角色「${sc.name}」作为调度引擎运行中（不在 UI 显示）`);
+      console.info(`[看不见的手] 系统角色「${sc.name}」作为调度引擎运行中（不在 UI 显示）`);
     }
 
     if (!visibleCharacters.length) {
       // No visible characters — Haiku logs to console, hint in chat
-      console.info('[Haiku] 当前房间无可发言角色。请在 /room 或 /character 中添加角色。');
+      console.info('[看不见的手] 当前房间无可发言角色。请在 /room 或 /character 中添加角色。');
       return {
         roomId,
         actions: [
@@ -103,13 +103,13 @@ export class HaikuService {
     const eligible = this.selectEligibleCharacters(visibleCharacters, roomMessages)
       .slice(0, MAX_CHARACTERS_PER_TURN);
 
-    const relevantNames = await this.judgeRelevance(userContent, eligible);
+    const relevantNames = await this.judgeRelevance(userContent, eligible, context);
     const charactersToSpeak = relevantNames.length > 0
       ? eligible.filter((c) => relevantNames.includes(c.name))
       : this.shuffle([...eligible]); // Fallback: all speak
 
     console.info(
-      `[Haiku] AI判定 → 应回复: ${charactersToSpeak.map((c) => c.name).join('、') || '(无)'}`
+      `[看不见的手] AI判定 → 应回复: ${charactersToSpeak.map((c) => c.name).join('、') || '(无)'}`
     );
 
     // ── Phase 3+4: Unified discussion queue ──
@@ -244,12 +244,27 @@ export class HaikuService {
    */
   private async judgeRelevance(
     userContent: string,
-    characters: Character[]
+    characters: Character[],
+    context: Array<{ role: Role; content: string }>
   ): Promise<string[]> {
     if (characters.length <= 1) return characters.map((c) => c.name);
 
     const charList = characters.map((c) => `${c.name}（${c.personality.slice(0, 20)}）`).join('、');
-    const prompt = `用户说：「${userContent}」\n\n房间内有以下角色：${charList}\n\n请判断哪些角色应该回复用户。只输出角色名字，多个用逗号分隔。如果用户提到具体名字，只输出那个名字。如果是对所有人说的，输出全部名字。`;
+
+    // Include recent conversation context so Haiku knows who user was talking to
+    const recentHistory = context
+      .slice(-6)
+      .map((m) => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content.slice(0, 60)}`)
+      .join('\n');
+
+    const prompt = `以下是最近的对话历史：
+${recentHistory || '(无)'}
+
+用户最新消息：「${userContent}」
+
+房间内的角色：${charList}
+
+请根据上下文判断：用户最新消息是在对谁说话？只输出角色名字，多个用逗号分隔。如果上下文显示用户一直在跟某个角色对话，即使最新消息没提名字，也应该只输出那个角色。如果是对所有人说的，输出全部名字。`;
 
     try {
       const haikuChar = this.characterStore.characters().find((c) => c.isSystem);
@@ -266,7 +281,7 @@ export class HaikuService {
         .map((s) => s.trim())
         .filter((n) => characters.some((c) => c.name === n));
 
-      console.info(`[Haiku] AI判断: "${userContent.slice(0, 30)}" → ${names.join(', ') || '(无)'}`);
+      console.info(`[看不见的手] AI判断: "${userContent.slice(0, 30)}" → ${names.join(', ') || '(无)'}`);
       return names;
     } catch {
       return []; // Fallback: let all speak
@@ -290,7 +305,7 @@ export class HaikuService {
     meta: Record<string, unknown>
   ): void {
     console.groupCollapsed(
-      `[Haiku] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['visibleCharacters']} visible (+${meta['systemCharacters']} system)`
+      `[看不见的手] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['visibleCharacters']} visible (+${meta['systemCharacters']} system)`
     );
     console.info('roomId', roomId);
     console.info('userContent', userContent.slice(0, 120));
