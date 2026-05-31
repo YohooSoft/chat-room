@@ -301,6 +301,12 @@ select {
   font-size: 0.9rem;
 }
 
+.danger-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .danger-btn {
   border: 1px solid #d32f2f;
   background: #ffffff;

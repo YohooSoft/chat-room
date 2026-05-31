@@ -192,12 +192,17 @@ export class SettingsComponent {
     this.temperature.set(clamped);
   }
 
+  resetAffinity(): void {
+    const state = this.storageService.read();
+    state.userAffinity = {};
+    this.storageService.write(state);
+    this.savedMessage.set('亲密度已重置');
+  }
+
   resetAllData(): void {
-    // Preserve custom models (API keys, model configs) — only reset chat data
     const savedModels = this.customModels();
     const savedProviderApiKeys = (this.storageService.read().user.preferences as Record<string, unknown>)['providerApiKeys'];
     this.storageService.clear();
-    // Restore model configs
     const state = this.storageService.read();
     state.user.preferences = {
       ...state.user.preferences as Record<string, unknown>,

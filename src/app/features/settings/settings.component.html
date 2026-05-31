@@ -281,8 +281,11 @@
 
     <section class="card danger-zone">
       <h2>数据管理</h2>
-      <p>清除房间、角色、消息和记忆数据。AI 模型配置（API Key、模型名）将保留。</p>
-      <button type="button" class="danger-btn" (click)="resetAllData()">清除所有数据</button>
+      <p>清除房间、角色、消息和记忆数据。AI 模型配置将保留。</p>
+      <div class="danger-actions">
+        <button type="button" class="danger-btn" (click)="resetAffinity()">重置亲密度</button>
+        <button type="button" class="danger-btn" (click)="resetAllData()">清除所有数据</button>
+      </div>
     </section>
   </form>
 </section>
