@@ -7,7 +7,7 @@ import { LlmService } from '../llm/llm.service';
 import { Role } from '../../shared/types/chat.types';
 
 const MAX_SPEAKERS_PER_ROUND = 5;
-const MAX_TOTAL_ROUNDS = 5;
+const MAX_AI_ROUNDS = 5; // AI-to-AI rounds after the initial user reply
 
 @Injectable({ providedIn: 'root' })
 export class DiscussionEngineService {
@@ -19,21 +19,30 @@ export class DiscussionEngineService {
   ) {}
 
   /**
-   * Run multi-round AI-to-AI discussion.
-   * Each round: every speaker takes one turn, seeing all previous messages.
-   * After MAX_TOTAL_ROUNDS rounds, pauses and shows a modal asking the user
-   * whether to continue.
+   * Unified sequential conversation engine.
+   *
+   * Round 0: Each character replies to the USER.
+   *          Later characters SEE what earlier ones said.
+   * Round 1~5: AI-to-AI free dialogue.
+   *            Context accumulates so no one repeats.
+   *
+   * After 5 AI-to-AI rounds, shows a modal asking to continue.
    */
-  async run(roomId: string, _round: number, speakers: string[]): Promise<void> {
-    const speakerCount = Math.min(speakers.length, MAX_SPEAKERS_PER_ROUND);
-    const activeSpeakers = speakers.slice(0, speakerCount);
-    if (activeSpeakers.length < 2) return;
+  async run(
+    roomId: string,
+    _round: number,
+    speakers: string[],
+    userContent?: string
+  ): Promise<void> {
+    const activeSpeakers = speakers.slice(0, MAX_SPEAKERS_PER_ROUND);
+    if (!activeSpeakers.length) return;
 
+    const characterMap = this.characterStore.byId();
     const otherNames = activeSpeakers
-      .map((id) => this.characterStore.getCharacter(id)?.name)
+      .map((id) => characterMap[id]?.name)
       .filter(Boolean);
 
-    // Build initial context from recent room messages
+    // ── Build initial context from recent room messages ──────────
     const roomMessages = this.chatStore.messagesForRoom(roomId);
     const context: Array<{ role: Role; content: string }> = roomMessages
       .slice(-8)
@@ -42,57 +51,91 @@ export class DiscussionEngineService {
         content: m.senderId === 'user' ? m.content : `[${m.senderId}]: ${m.content}`
       }));
 
-    for (let round = 1; round <= MAX_TOTAL_ROUNDS; round++) {
-      console.info(`[DiscussionEngine] AI 对话第 ${round}/${MAX_TOTAL_ROUNDS} 轮`);
+    // ── Round 0: Reply to USER sequentially ─────────────────────
+    console.info(`[DiscussionEngine] Round 0 — 回复用户`);
+    await this.runRound(activeSpeakers, otherNames, context, 0, userContent, roomId);
 
-      for (const speakerId of activeSpeakers) {
-        const character = this.characterStore.getCharacter(speakerId);
-        if (!character) continue;
-
-        const peers = otherNames.filter((n) => n !== character.name);
-        const positionGuidance = round === 1
-          ? '这是第一轮，你第一个发言——请大胆表达。'
-          : '前面已经有多轮对话了，请不要重复之前的内容——提出新角度，或者深入探讨某个细节，也可以质疑或反驳。';
-        const systemMsg = peers.length
-          ? `你是 ${character.name}。AI 对话第 ${round} 轮，你正在与 ${peers.join('、')} 交流。像真人聊天一样自然回应——可以加语气词、动作、情绪。${positionGuidance}${character.personality ? ` 你的性格：${character.personality}` : ''}`
-          : `你是 ${character.name}。讨论轮次 ${round}。`;
-
-        const messages: Array<{ role: Role; content: string }> = [
-          { role: 'system', content: systemMsg },
-          ...context,
-          { role: 'user' as Role, content: `请以 ${character.name} 的身份回应。` }
-        ];
-
-        const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
-
-        try {
-          const stream = this.llmService.chatStream(character.model.provider, {
-            model: character.model.model,
-            temperature: character.model.temperature,
-            messages
-          });
-
-          let fullContent = '';
-          for await (const chunk of stream) {
-            fullContent += chunk;
-            this.chatStore.appendStreamChunk(messageId, chunk);
-          }
-
-          this.chatStore.finalizeStreamedMessage(messageId);
-
-          // Append to rolling context so the NEXT speaker sees this
-          context.push({
-            role: 'assistant' as Role,
-            content: `[${character.name}]: ${fullContent}`
-          });
-        } catch {
-          this.chatStore.finalizeStreamedMessage(messageId);
-        }
-      }
+    // ── Rounds 1~5: AI-to-AI dialogue ───────────────────────────
+    for (let round = 1; round <= MAX_AI_ROUNDS; round++) {
+      console.info(`[DiscussionEngine] Round ${round}/${MAX_AI_ROUNDS} — AI 自由对话`);
+      await this.runRound(activeSpeakers, otherNames, context, round, undefined, roomId);
     }
 
-    // All rounds complete — pause and ask user
-    console.info(`[DiscussionEngine] ${MAX_TOTAL_ROUNDS} 轮完成，弹窗询问`);
+    // ── Pause & ask user ────────────────────────────────────────
+    console.info(`[DiscussionEngine] ${MAX_AI_ROUNDS} 轮完成，弹窗询问`);
     this.uiStore.pauseDiscussion(roomId, speakers);
+  }
+
+  private async runRound(
+    speakers: string[],
+    otherNames: string[],
+    context: Array<{ role: Role; content: string }>,
+    round: number,
+    userContent: string | undefined,
+    roomId: string
+  ): Promise<void> {
+    for (const speakerId of speakers) {
+      const character = this.characterStore.getCharacter(speakerId);
+      if (!character) continue;
+
+      const peers = otherNames.filter((n) => n !== character.name);
+
+      // Build the right system prompt for this round
+      let systemMsg: string;
+      if (round === 0) {
+        // Reply to user — like a group chat where people see each other's messages
+        const positionIndex = speakers.indexOf(speakerId);
+        if (positionIndex === 0) {
+          systemMsg = `你是 ${character.name}。你正在一个群聊中，用户刚刚说：「${userContent || '请回应'}」。你是第一个看到这条消息的人，请用你的风格自然回应。${character.personality ? `你的性格：${character.personality}` : ''}`;
+        } else {
+          const prevName = speakers
+            .slice(0, positionIndex)
+            .map((id) => this.characterStore.getCharacter(id)?.name)
+            .filter(Boolean)
+            .join('、');
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || '请回应'}」。在你之前，${prevName} 已经回复了（见上方）。你现在才看到消息——请像真人聊天一样：可以附和、反驳、补充新角度、或者另起话题。不要复读前面的人。${character.personality ? `你的性格：${character.personality}` : ''}`;
+        }
+      } else {
+        // AI-to-AI — natural group chat
+        const guidance = round === 1
+          ? '大家刚聊起来，放轻松——想到什么说什么。'
+          : `已经聊了 ${round} 轮了——别重复老话题，可以深入细节、换角度、甚至歪楼。`;
+        systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。像朋友之间那样自然——可以有语气词、小动作、玩笑、调侃，想到什么说什么。${guidance}${character.personality ? ` 你的性格：${character.personality}` : ''}`;
+      }
+
+      const messages: Array<{ role: Role; content: string }> = [
+        { role: 'system', content: systemMsg },
+        ...context,
+        { role: 'user' as Role, content: round === 0 ? (userContent || '请回应') : `${character.name}，轮到你了。` }
+      ];
+
+      const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
+      let fullContent = '';
+
+      try {
+        const stream = this.llmService.chatStream(character.model.provider, {
+          model: character.model.model,
+          temperature: character.model.temperature,
+          messages
+        });
+
+        for await (const chunk of stream) {
+          fullContent += chunk;
+          this.chatStore.appendStreamChunk(messageId, chunk);
+        }
+
+        this.chatStore.finalizeStreamedMessage(messageId);
+      } catch {
+        this.chatStore.finalizeStreamedMessage(messageId);
+      }
+
+      // Append to rolling context so the NEXT speaker sees this
+      if (fullContent) {
+        context.push({
+          role: 'assistant' as Role,
+          content: `[${character.name}]: ${fullContent}`
+        });
+      }
+    }
   }
 }

@@ -193,7 +193,18 @@ export class SettingsComponent {
   }
 
   resetAllData(): void {
+    // Preserve custom models (API keys, model configs) — only reset chat data
+    const savedModels = this.customModels();
+    const savedProviderApiKeys = (this.storageService.read().user.preferences as Record<string, unknown>)['providerApiKeys'];
     this.storageService.clear();
+    // Restore model configs
+    const state = this.storageService.read();
+    state.user.preferences = {
+      ...state.user.preferences as Record<string, unknown>,
+      customModels: savedModels,
+      ...(savedProviderApiKeys ? { providerApiKeys: savedProviderApiKeys } : {})
+    };
+    this.storageService.write(state);
     window.location.reload();
   }
 

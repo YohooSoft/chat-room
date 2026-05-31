@@ -53,7 +53,7 @@ export class ExecutionEngineService {
           break;
         case 'trigger_discussion':
           action.speakers.forEach((id) => participants.add(id));
-          await this.discussionEngine.run(plan.roomId, action.round, action.speakers);
+          await this.discussionEngine.run(plan.roomId, action.round, action.speakers, action.userContent);
           break;
         case 'ui_event':
           this.uiStore.update(action.event);

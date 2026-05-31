@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { RoomStore } from '../../store/room.store';
-import { Character, Action, ExecutionPlan, Role } from '../../shared/types/chat.types';
+import { Action, Character, ExecutionPlan, Role } from '../../shared/types/chat.types';
 import { MemoryCompressorService } from '../memory/memory-compressor.service';
 
 // ── Scheduling Constants ────────────────────────────────────────────
@@ -107,34 +107,22 @@ export class HaikuService {
       `[Haiku] 发言顺序: ${charactersToSpeak.map((c) => c.name).join(' → ')}`
     );
 
-    // ── Phase 3: Decide Discussion (2+ characters → AI dialogue) ─
-    const shouldTriggerDiscussion = charactersToSpeak.length >= 2;
-
-    // ── Phase 4: Round 1 — sequential replies to user ───────────
-    // Each character sees their position: first leads, others react
-    for (let i = 0; i < charactersToSpeak.length; i++) {
-      if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
-      const character = charactersToSpeak[i];
-      const positionHint = charactersToSpeak.length >= 2
-        ? (i === 0
-            ? '你是第一个回应用户的。请大胆抛出你的观点，不要保守。'
-            : `你是第 ${i + 1} 个回应的。前面的人已经说过了，请不要重复——可以反驳、补充新角度、或从不同侧面展开。`)
-        : '';
-      actions.push(this.buildModelCall(character, context, userContent, positionHint));
-    }
-
-    // ── Phase 4b: AI-to-AI discussion (after user replies) ──
-    if (shouldTriggerDiscussion) {
+    // ── Phase 3+4: Unified discussion queue ──
+    // DiscussionEngine runs everything sequentially:
+    //   Round 0 = reply to user (each sees previous responses)
+    //   Round 1-5 = AI-to-AI dialogue
+    if (charactersToSpeak.length >= 1) {
       const speakerIds = charactersToSpeak.map((c) => c.id);
 
       console.info(
-        `[Haiku] 触发 AI 对话：${charactersToSpeak.map((c) => c.name).join(' → ')}（5轮自动循环）`
+        `[Haiku] 发言顺序: ${charactersToSpeak.map((c) => c.name).join(' → ')}（统一队列，含回应用户 + AI对话）`
       );
 
       actions.push({
         type: 'trigger_discussion',
-        round: 1,
-        speakers: speakerIds
+        round: 0,
+        speakers: speakerIds,
+        userContent
       });
     }
 
@@ -160,8 +148,7 @@ export class HaikuService {
       totalCharacters: allCharacters.length,
       visibleCharacters: visibleCharacters.length,
       systemCharacters: systemCharacters.length,
-      speakingCount: charactersToSpeak.length,
-      discussionTriggered: shouldTriggerDiscussion
+      speakingCount: charactersToSpeak.length
     });
 
     return { roomId, actions };
@@ -250,81 +237,12 @@ export class HaikuService {
     return Math.min(1, Math.max(0, Math.round(score * 100) / 100));
   }
 
-  // ── Model Call Builder ───────────────────────────────────────────
-
-  private buildModelCall(
-    character: Character,
-    context: Array<{ role: Role; content: string }>,
-    userContent: string,
-    positionHint?: string
-  ): Extract<Action, { type: 'call_model' }> {
-    const messages: Array<{ role: Role; content: string }> = [];
-    const systemPrompt = this.buildSystemPrompt(character, positionHint);
-
-    if (systemPrompt) {
-      messages.push({ role: 'system', content: systemPrompt });
-    }
-
-    messages.push(...context);
-    messages.push({ role: 'user', content: userContent });
-
-    return {
-      type: 'call_model',
-      characterId: character.id,
-      provider: character.model.provider,
-      model: character.model.model,
-      temperature: character.model.temperature,
-      messages
-    };
-  }
-
   private shuffle<T>(arr: T[]): T[] {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
     return arr;
-  }
-
-  // ── System Prompt Builder ────────────────────────────────────────
-
-  /**
-   * Build a stable system prompt for a character.
-   *
-   * Advanced mode: uses the custom systemPrompt directly.
-   * Auto mode: constructs from personality + background with a consistent
-   * template that ensures role-consistent, natural responses.
-   */
-  buildSystemPrompt(character: Character, positionHint?: string): string {
-    if (character.promptMode === 'advanced' && character.systemPrompt) {
-      const base = character.systemPrompt;
-      return positionHint ? `${base}\n\n${positionHint}` : base;
-    }
-
-    const parts: string[] = [];
-
-    parts.push(`你是「${character.name}」。`);
-
-    if (character.personality) {
-      parts.push(`性格：${character.personality}。`);
-    }
-    if (character.background) {
-      parts.push(`背景：${character.background}。`);
-    }
-
-    // Diversity & natural conversation guidelines
-    parts.push(
-      '像正常人聊天一样回应——可以加入语气词、动作描述、停顿，让对话生动自然。',
-      '不要输出论文式的长篇大论，像朋友聊天那样简洁有趣。',
-      '如果有其他人在场，不要重复他们的话——要么提出新观点，要么反驳，要么从另一个角度补充。',
-      '不要使用 thinking、think 标签。'
-    );
-
-    if (positionHint) {
-      parts.push(positionHint);
-    }
-
-    return parts.join(' ');
   }
 
   // ── Debug Logging ────────────────────────────────────────────────
@@ -336,7 +254,7 @@ export class HaikuService {
     meta: Record<string, unknown>
   ): void {
     console.groupCollapsed(
-      `[Haiku] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['visibleCharacters']} visible (+${meta['systemCharacters']} system) | discussion: ${meta['discussionTriggered']}`
+      `[Haiku] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['visibleCharacters']} visible (+${meta['systemCharacters']} system)`
     );
     console.info('roomId', roomId);
     console.info('userContent', userContent.slice(0, 120));

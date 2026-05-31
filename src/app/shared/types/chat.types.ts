@@ -82,6 +82,7 @@ export type Action =
       type: 'trigger_discussion';
       round: number;
       speakers: string[];
+      userContent?: string;
     }
   | {
       type: 'ui_event';
