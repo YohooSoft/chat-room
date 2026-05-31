@@ -33,14 +33,19 @@
       </select>
 
       <label for="model">默认模型</label>
-      <input
+      <select
         id="model"
-        type="text"
         name="model"
         [ngModel]="model()"
         (ngModelChange)="model.set($event)"
-        placeholder="例如 gpt-4o-mini"
-      />
+      >
+        @if (!customModels().length) {
+          <option value="gpt-4o-mini">gpt-4o-mini</option>
+        }
+        @for (m of customModels(); track m.provider + ':' + m.model) {
+          <option [value]="m.model">{{ m.provider }} / {{ m.model }}</option>
+        }
+      </select>
 
       <label>温度</label>
       <div class="temperature-row">
@@ -77,7 +82,14 @@
         <div class="api-keys-grid">
           @for (provider of providers; track provider) {
             <div class="api-key-card">
-              <h3>{{ provider }}</h3>
+              <h3>
+                {{ provider }}
+                @if (provider === 'gemini') {
+                  <span class="api-type-tag genai">GenAI</span>
+                } @else {
+                  <span class="api-type-tag openai-fmt">OpenAI 格式</span>
+                }
+              </h3>
               <label [for]="'apiKey-' + provider">API Key</label>
               <input
                 [id]="'apiKey-' + provider"
@@ -111,31 +123,57 @@
       <h2>模型管理</h2>
       <p class="card-intro">添加自定义模型，供角色编辑器选用。</p>
 
-      <div class="add-model-row">
-        <select
-          name="newModelProvider"
-          [ngModel]="newModelProvider()"
-          (ngModelChange)="newModelProvider.set($event)"
-        >
-          @for (option of providers; track option) {
-            <option [value]="option">{{ option }}</option>
-          }
-        </select>
-        <input
-          type="text"
-          name="newModelName"
-          placeholder="模型名称，例如 gpt-4o"
-          [ngModel]="newModelName()"
-          (ngModelChange)="newModelName.set($event)"
-        />
-        <button
-          type="button"
-          class="primary small"
-          [disabled]="!newModelName().trim()"
-          (click)="addModel()"
-        >
-          添加
-        </button>
+      <div class="add-model-form">
+        <div class="add-model-row">
+          <select
+            name="newModelProvider"
+            [ngModel]="newModelProvider()"
+            (ngModelChange)="newModelProvider.set($event)"
+          >
+            @for (option of providers; track option) {
+              <option [value]="option">{{ option }}</option>
+            }
+          </select>
+          <input
+            type="text"
+            name="newModelName"
+            placeholder="模型名称，例如 gpt-4o"
+            [ngModel]="newModelName()"
+            (ngModelChange)="newModelName.set($event)"
+          />
+          <button
+            type="button"
+            class="primary small"
+            [disabled]="!newModelName().trim()"
+            (click)="addModel()"
+          >
+            添加
+          </button>
+        </div>
+        <div class="add-model-row-extra">
+          <input
+            type="password"
+            name="newModelApiKey"
+            placeholder="API Key（可选，sk-...）"
+            [ngModel]="newModelApiKey()"
+            (ngModelChange)="newModelApiKey.set($event)"
+          />
+          <input
+            type="text"
+            name="newModelBaseUrl"
+            placeholder="Base URL（可选，自定义端点）"
+            [ngModel]="newModelBaseUrl()"
+            (ngModelChange)="newModelBaseUrl.set($event)"
+          />
+          <label class="checkbox-item genai-check">
+            <input
+              type="checkbox"
+              [checked]="newModelIsGenAI()"
+              (change)="newModelIsGenAI.set(!newModelIsGenAI())"
+            />
+            <span>GenAI 格式</span>
+          </label>
+        </div>
       </div>
 
       <label for="modelSearch">搜索模型</label>
@@ -153,17 +191,31 @@
           <div class="model-table-header">
             <span>Provider</span>
             <span>Model</span>
+            <span>API</span>
             <span></span>
           </div>
           @for (model of filteredModels(); track model.provider + ':' + model.model; let i = $index) {
             <div class="model-row">
               <span class="model-provider">{{ model.provider }}</span>
               <span class="model-name">{{ model.model }}</span>
+              <span class="model-api-status">
+                @if (model.apiKey) {
+                  <span class="key-status configured">✓ Key</span>
+                } @else {
+                  <span class="key-status unconfigured">-</span>
+                }
+                @if (model.baseUrl) {
+                  <span class="key-status url-set">URL</span>
+                }
+                @if (model.isGenAI) {
+                  <span class="api-type-tag genai">GenAI</span>
+                }
+              </span>
               <button
                 type="button"
                 class="icon-btn danger"
                 title="删除模型"
-                (click)="removeModel(i)"
+                (click)="removeModel(model.provider, model.model)"
               >×</button>
             </div>
           }
@@ -211,6 +263,70 @@
         <span class="saved">{{ savedMessage() }}</span>
       }
     </div>
+
+    <section class="card">
+      <h2>WebDAV 云同步</h2>
+      <p class="card-intro">将数据备份到 WebDAV 服务器，支持跨设备同步。</p>
+
+      <label for="webdavUrl">WebDAV 地址</label>
+      <input
+        id="webdavUrl"
+        type="text"
+        name="webdavUrl"
+        placeholder="https://dav.example.com/remote.php/dav/files/user/"
+        [ngModel]="webdavUrl()"
+        (ngModelChange)="webdavUrl.set($event)"
+      />
+
+      <label for="webdavUser">用户名</label>
+      <input
+        id="webdavUser"
+        type="text"
+        name="webdavUser"
+        placeholder="username"
+        [ngModel]="webdavUsername()"
+        (ngModelChange)="webdavUsername.set($event)"
+      />
+
+      <label for="webdavPass">密码</label>
+      <input
+        id="webdavPass"
+        type="password"
+        name="webdavPass"
+        placeholder="••••••••"
+        [ngModel]="webdavPassword()"
+        (ngModelChange)="webdavPassword.set($event)"
+      />
+
+      <label for="webdavPath">远程文件路径（可选）</label>
+      <input
+        id="webdavPath"
+        type="text"
+        name="webdavPath"
+        placeholder="ai-drama-engine.json"
+        [ngModel]="webdavPath()"
+        (ngModelChange)="webdavPath.set($event)"
+      />
+
+      <div class="webdav-actions">
+        <button type="button" (click)="testWebdavConnection()" [disabled]="webdavConnecting()">测试连接</button>
+        <button type="button" class="primary" (click)="exportToWebdav()" [disabled]="webdavConnecting()">导出到云端</button>
+        <button type="button" class="primary" (click)="importFromWebdav()" [disabled]="webdavConnecting()">从云端导入</button>
+      </div>
+
+      @if (webdavStatus()) {
+        <p class="sync-status">{{ webdavStatus() }}</p>
+      }
+      @if (webdavError()) {
+        <p class="sync-error">{{ webdavError() }}</p>
+      }
+      @if (lastSyncInfo()?.lastExport) {
+        <p class="sync-info">最后导出：{{ lastSyncInfo()?.lastExport }}</p>
+      }
+      @if (lastSyncInfo()?.lastImport) {
+        <p class="sync-info">最后导入：{{ lastSyncInfo()?.lastImport }}</p>
+      }
+    </section>
 
     <section class="card danger-zone">
       <h2>数据管理</h2>

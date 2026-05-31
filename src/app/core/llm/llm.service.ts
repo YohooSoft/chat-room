@@ -138,6 +138,130 @@ class OpenAiCompatibleProvider implements LlmProvider {
   }
 }
 
+/**
+ * Google Gemini (GenAI) real API provider.
+ * Uses the Gemini-specific generateContent endpoint with API key as query parameter.
+ */
+class GeminiProvider implements LlmProvider {
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey: string
+  ) {}
+
+  async chat(request: ChatRequest): Promise<ChatResponse> {
+    const model = request.model || 'gemini-2.0-flash';
+    const endpoint = `${this.baseUrl}/models/${model}:generateContent?key=${this.apiKey}`;
+
+    // Convert OpenAI-format messages to Gemini contents
+    const contents = request.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+    // System prompt as systemInstruction
+    const systemMessages = request.messages.filter((m) => m.role === 'system');
+    const body: Record<string, unknown> = {
+      contents,
+      generationConfig: {
+        temperature: request.temperature ?? 0.7
+      }
+    };
+
+    if (systemMessages.length) {
+      body['systemInstruction'] = {
+        parts: systemMessages.map((m) => ({ text: m.content }))
+      };
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      throw new Error(`Gemini API error ${res.status}: ${await res.text().catch(() => 'unknown')}`);
+    }
+
+    const data = await res.json();
+    return {
+      content: data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    };
+  }
+
+  async *chatStream(request: ChatRequest): AsyncGenerator<string, ChatResponse> {
+    const model = request.model || 'gemini-2.0-flash';
+    const endpoint = `${this.baseUrl}/models/${model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+
+    const contents = request.messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+    const systemMessages = request.messages.filter((m) => m.role === 'system');
+    const body: Record<string, unknown> = {
+      contents,
+      generationConfig: {
+        temperature: request.temperature ?? 0.7
+      }
+    };
+
+    if (systemMessages.length) {
+      body['systemInstruction'] = {
+        parts: systemMessages.map((m) => ({ text: m.content }))
+      };
+    }
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      throw new Error(`Gemini API error ${res.status}: ${await res.text().catch(() => 'unknown')}`);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullContent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const data = trimmed.slice(6);
+        try {
+          const parsed = JSON.parse(data);
+          const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            fullContent += text;
+            yield text;
+          }
+        } catch {
+          // Skip malformed SSE
+        }
+      }
+    }
+
+    return { content: fullContent };
+  }
+}
+
 @Injectable({ providedIn: 'root' })
 export class LlmService {
   private readonly mockProviders = new Map<string, MockProvider>([
@@ -154,39 +278,76 @@ export class LlmService {
    * If an API key is configured in user preferences, a real API provider is returned.
    * Otherwise, falls back to the mock provider.
    */
-  private resolveProvider(providerName: string): LlmProvider {
+  /**
+   * Resolve the provider for a given name.
+   *
+   * Priority:
+   * 1. Provider-level API key from settings (providerApiKeys)
+   * 2. Model-specific API key from custom models list (customModels)
+   * 3. Mock provider (fallback)
+   */
+  private resolveProvider(providerName: string, modelName?: string): LlmProvider {
     const state = this.storageService.state();
-    const apiKeys = (state.user.preferences as Record<string, unknown>)
-      ?.['providerApiKeys'] as Record<string, { apiKey: string; baseUrl: string }> | undefined;
-    const config = apiKeys?.[providerName];
+    const preferences = state.user.preferences as Record<string, unknown>;
+    const apiKeys = preferences?.['providerApiKeys'] as
+      | Record<string, { apiKey: string; baseUrl: string }>
+      | undefined;
+    const customModels = preferences?.['customModels'] as
+      | Array<{ provider: string; model: string; apiKey?: string; baseUrl?: string; isGenAI?: boolean }>
+      | undefined;
 
-    if (config?.apiKey) {
-      const baseUrl = config.baseUrl || DEFAULT_BASE_URLS[providerName] || '';
+    // 1. Check provider-level API key
+    const providerConfig = apiKeys?.[providerName];
+    if (providerConfig?.apiKey) {
+      const baseUrl = providerConfig.baseUrl || DEFAULT_BASE_URLS[providerName] || '';
       if (baseUrl) {
-        console.info(`[LlmService] 使用真实 API: ${providerName} @ ${baseUrl}`);
-        return new OpenAiCompatibleProvider(baseUrl, config.apiKey);
+        console.info(`[LlmService] 使用 Provider API: ${providerName} @ ${baseUrl}`);
+        return this.createRealProvider(providerName, baseUrl, providerConfig.apiKey);
       }
     }
 
-    // Fallback to mock
+    // 2. Check model-specific API key from custom models
+    if (modelName && customModels?.length) {
+      const modelConfig = customModels.find(
+        (m) => m.provider === providerName && m.model === modelName && m.apiKey
+      );
+      if (modelConfig?.apiKey) {
+        const baseUrl = modelConfig.baseUrl || DEFAULT_BASE_URLS[providerName] || '';
+        if (baseUrl) {
+          console.info(`[LlmService] 使用 Model API: ${providerName}/${modelName} @ ${baseUrl}`);
+          if (modelConfig.isGenAI) {
+            return new GeminiProvider(baseUrl, modelConfig.apiKey);
+          }
+          return new OpenAiCompatibleProvider(baseUrl, modelConfig.apiKey);
+        }
+      }
+    }
+
+    // 3. Fallback to mock
     const mock = this.mockProviders.get(providerName);
     if (mock) return mock;
 
-    // Unknown provider — create a generic mock
     const genericMock = new MockProvider(providerName);
     this.mockProviders.set(providerName, genericMock);
     return genericMock;
   }
 
+  private createRealProvider(providerName: string, baseUrl: string, apiKey: string): LlmProvider {
+    if (providerName === 'gemini') {
+      return new GeminiProvider(baseUrl, apiKey);
+    }
+    return new OpenAiCompatibleProvider(baseUrl, apiKey);
+  }
+
   async chat(providerName: string, request: ChatRequest): Promise<ChatResponse> {
-    return this.resolveProvider(providerName).chat(request);
+    return this.resolveProvider(providerName, request.model).chat(request);
   }
 
   async *chatStream(
     providerName: string,
     request: ChatRequest
   ): AsyncGenerator<string, ChatResponse> {
-    const provider = this.resolveProvider(providerName);
+    const provider = this.resolveProvider(providerName, request.model);
     if (provider.chatStream) {
       return yield* provider.chatStream(request);
     }

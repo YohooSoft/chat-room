@@ -64,9 +64,7 @@ export class StorageService {
   }
 
   read(): AppStorageState {
-    const state = this.readFromStorage();
-    this.stateSignal.set(state);
-    return structuredClone(state);
+    return structuredClone(this.readFromStorage());
   }
 
   write(state: AppStorageState): void {

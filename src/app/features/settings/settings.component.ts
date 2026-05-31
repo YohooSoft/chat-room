@@ -2,11 +2,15 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { StorageService } from '../../core/storage/storage.service';
+import { WebDavSyncService } from '../../core/storage/webdav-sync.service';
 import { AppStorageState } from '../../shared/types/chat.types';
 
 interface CustomModel {
   provider: string;
   model: string;
+  apiKey?: string;
+  baseUrl?: string;
+  isGenAI?: boolean;
 }
 
 interface ProviderApiConfig {
@@ -43,6 +47,7 @@ const DEFAULT_TEMPERATURE = 0.7;
 })
 export class SettingsComponent {
   private readonly storageService = inject(StorageService);
+  private readonly webdavSync = inject(WebDavSyncService);
 
   readonly providers = ['openai', 'claude', 'gemini', 'openai-compatible'];
 
@@ -57,10 +62,23 @@ export class SettingsComponent {
   readonly modelSearch = signal('');
   readonly newModelProvider = signal(DEFAULT_PROVIDER);
   readonly newModelName = signal('');
+  readonly newModelApiKey = signal('');
+  readonly newModelBaseUrl = signal('');
+  readonly newModelIsGenAI = signal(false);
 
   // API keys
   readonly apiKeys = signal<Record<string, ProviderApiConfig>>({});
   readonly showApiKeys = signal(false);
+
+  // WebDAV sync
+  readonly webdavUrl = signal('');
+  readonly webdavUsername = signal('');
+  readonly webdavPassword = signal('');
+  readonly webdavPath = signal('');
+  readonly webdavStatus = signal('');
+  readonly webdavError = signal('');
+  readonly webdavConnecting = signal(false);
+  readonly lastSyncInfo = signal(this.webdavSync.getLastSyncInfo());
 
   readonly filteredModels = computed(() => {
     const search = this.modelSearch().toLowerCase().trim();
@@ -156,25 +174,37 @@ export class SettingsComponent {
     if (!modelName) {
       return;
     }
+    const provider = this.newModelProvider();
     const exists = this.customModels().some(
-      (m) => m.provider === this.newModelProvider() && m.model === modelName
+      (m) => m.provider === provider && m.model === modelName
     );
     if (exists) {
       return;
     }
+    const apiKey = this.newModelApiKey().trim();
+    const baseUrl = this.newModelBaseUrl().trim();
+    const isGenAI = this.newModelIsGenAI();
+
     this.customModels.update((models) => [
       ...models,
-      { provider: this.newModelProvider(), model: modelName }
+      {
+        provider,
+        model: modelName,
+        ...(apiKey ? { apiKey } : {}),
+        ...(baseUrl ? { baseUrl } : {}),
+        ...(isGenAI ? { isGenAI: true } : {})
+      }
     ]);
     this.newModelName.set('');
+    this.newModelApiKey.set('');
+    this.newModelBaseUrl.set('');
+    this.newModelIsGenAI.set(false);
   }
 
-  removeModel(index: number): void {
-    this.customModels.update((models) => {
-      const next = [...models];
-      next.splice(index, 1);
-      return next;
-    });
+  removeModel(provider: string, modelName: string): void {
+    this.customModels.update((models) =>
+      models.filter((m) => !(m.provider === provider && m.model === modelName))
+    );
   }
 
   updateTemperature(value: string): void {
@@ -189,6 +219,87 @@ export class SettingsComponent {
   resetAllData(): void {
     this.storageService.clear();
     window.location.reload();
+  }
+
+  // ── WebDAV sync ────────────────────────────────────────────────
+
+  async testWebdavConnection(): Promise<void> {
+    this.webdavConnecting.set(true);
+    this.webdavError.set('');
+    this.webdavStatus.set('正在测试连接...');
+
+    const ok = await this.webdavSync.testConnection({
+      url: this.webdavUrl().trim(),
+      username: this.webdavUsername(),
+      password: this.webdavPassword(),
+      remotePath: this.webdavPath()
+    });
+
+    this.webdavConnecting.set(false);
+    if (ok) {
+      this.webdavStatus.set('✓ 连接成功');
+      this.webdavError.set('');
+    } else {
+      this.webdavError.set('连接失败，请检查 URL 和凭据。');
+      this.webdavStatus.set('');
+    }
+  }
+
+  async exportToWebdav(): Promise<void> {
+    const url = this.webdavUrl().trim();
+    if (!url) {
+      this.webdavError.set('请输入 WebDAV 地址。');
+      return;
+    }
+
+    this.webdavConnecting.set(true);
+    this.webdavError.set('');
+    this.webdavStatus.set('正在导出...');
+
+    try {
+      const timestamp = await this.webdavSync.exportToWebDav({
+        url,
+        username: this.webdavUsername(),
+        password: this.webdavPassword(),
+        remotePath: this.webdavPath()
+      });
+      this.webdavStatus.set(`✓ 已导出 ${new Date(timestamp).toLocaleTimeString('zh-CN')}`);
+      this.webdavError.set('');
+    } catch (err) {
+      this.webdavError.set(err instanceof Error ? err.message : '导出失败');
+      this.webdavStatus.set('');
+    } finally {
+      this.webdavConnecting.set(false);
+    }
+  }
+
+  async importFromWebdav(): Promise<void> {
+    const url = this.webdavUrl().trim();
+    if (!url) {
+      this.webdavError.set('请输入 WebDAV 地址。');
+      return;
+    }
+
+    this.webdavConnecting.set(true);
+    this.webdavError.set('');
+    this.webdavStatus.set('正在导入...');
+
+    try {
+      await this.webdavSync.importFromWebDav({
+        url,
+        username: this.webdavUsername(),
+        password: this.webdavPassword(),
+        remotePath: this.webdavPath()
+      });
+      this.webdavStatus.set('✓ 已导入并合并数据，页面即将刷新...');
+      this.webdavError.set('');
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      this.webdavError.set(err instanceof Error ? err.message : '导入失败');
+      this.webdavStatus.set('');
+    } finally {
+      this.webdavConnecting.set(false);
+    }
   }
 
   private load(): void {
