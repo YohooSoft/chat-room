@@ -63,10 +63,9 @@ export class DiscussionEngineService {
         console.info(`[DiscussionEngine] Round ${round}/${MAX_AI_ROUNDS} — AI 自由对话`);
         await this.runSequentialRound(responsiveSpeakers, otherNames, context, round, undefined, roomId);
       }
+      console.info('[DiscussionEngine] 完成，弹窗询问');
+      this.uiStore.pauseDiscussion(roomId, speakers);
     }
-
-    console.info('[DiscussionEngine] 完成，弹窗询问');
-    this.uiStore.pauseDiscussion(roomId, speakers);
   }
 
   private async runSequentialRound(
