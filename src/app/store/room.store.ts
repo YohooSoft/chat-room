@@ -7,7 +7,7 @@ import { StorageService } from '../core/storage/storage.service';
 const DEFAULT_ROOM: Room = {
   id: 'main-room',
   name: '主舞台',
-  characterIds: ['haiku']
+  characterIds: ['assistant'] // Haiku 是调度器不参与对话，assistant 是可见 AI
 };
 
 @Injectable({ providedIn: 'root' })

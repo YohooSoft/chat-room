@@ -90,7 +90,9 @@ export class RoomComponent {
   readonly availableCharacters = computed(() => {
     const room = this.activeRoom();
     const assignedIds = new Set(room?.characterIds ?? []);
-    return this.characterStore.characters().filter((c) => !assignedIds.has(c.id));
+    return this.characterStore.characters().filter(
+      (c) => !assignedIds.has(c.id) && !c.isSystem
+    );
   });
 
   constructor() {

@@ -39,6 +39,11 @@ export class ChatComponent {
     this.chatStore.messagesForRoom(this.roomStore.activeRoomId())
   );
 
+  senderName(senderId: string): string {
+    if (senderId === 'user') return '你';
+    return this.characterStore.byId()[senderId]?.name ?? senderId;
+  }
+
   constructor() {
     this.orchestrator.init();
   }

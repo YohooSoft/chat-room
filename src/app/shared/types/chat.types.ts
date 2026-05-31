@@ -43,6 +43,8 @@ export interface Character {
   systemPrompt?: string;
   model: CharacterModelConfig;
   relations: Record<string, Relation>;
+  /** System characters (like Haiku scheduler) don't produce visible chat messages. */
+  isSystem?: boolean;
 }
 
 export interface Room {

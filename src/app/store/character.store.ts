@@ -8,8 +8,22 @@ const DEFAULT_CHARACTERS: Character[] = [
   {
     id: 'haiku',
     name: 'Haiku',
-    personality: '既是导演也是评论家，能推进剧情、分配角色，同时关注逻辑一致性和人物动机',
-    background: 'AI Drama Engine 核心调度者，身兼导演与评论家双职',
+    personality: '幕后调度者，不参与对话，仅生成执行计划并输出到 Console',
+    background: 'AI Drama Engine 核心调度引擎',
+    promptMode: 'auto',
+    isSystem: true,
+    model: {
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      temperature: 0.7
+    },
+    relations: {}
+  },
+  {
+    id: 'assistant',
+    name: 'AI 助手',
+    personality: '友好、知识渊博、乐于助人',
+    background: '通用 AI 对话助手',
     promptMode: 'auto',
     model: {
       provider: 'openai',
@@ -25,7 +39,7 @@ const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
 
 /** System characters that cannot be deleted. */
-const PROTECTED_CHARACTER_IDS = new Set(['haiku']);
+const PROTECTED_CHARACTER_IDS = new Set(['haiku', 'assistant']);
 
 @Injectable({ providedIn: 'root' })
 export class CharacterStore {

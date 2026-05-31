@@ -58,8 +58,23 @@ export class HaikuService {
    */
   createPlan(roomId: string, userContent: string): ExecutionPlan {
     const allCharacters = this.characterStore.characters();
-    if (!allCharacters.length) {
-      return { roomId, actions: [] };
+
+    // Split: system characters (Haiku) are scheduler-only, never produce visible msgs
+    const visibleCharacters = allCharacters.filter((c) => !c.isSystem);
+    const systemCharacters = allCharacters.filter((c) => c.isSystem);
+
+    // Log system character activity to console only
+    for (const sc of systemCharacters) {
+      console.info(`[Haiku] 系统角色「${sc.name}」作为调度引擎运行中（不在 UI 显示）`);
+    }
+
+    if (!visibleCharacters.length) {
+      // No visible characters to respond — Haiku only logs to console
+      console.info('[Haiku] 当前房间无可发言角色，仅生成调度日志');
+      return {
+        roomId,
+        actions: [{ type: 'ui_event', event: 'typing' }, { type: 'ui_event', event: 'stop_typing' }]
+      };
     }
 
     const roomMessages = this.chatStore.messagesForRoom(roomId);
@@ -82,8 +97,8 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Eligible Characters ─────────────────────
-    const eligibleCharacters = this.selectEligibleCharacters(allCharacters, roomMessages);
+    // ── Phase 2: Select Eligible Characters (visible only) ──────
+    const eligibleCharacters = this.selectEligibleCharacters(visibleCharacters, roomMessages);
     const charactersToSpeak = eligibleCharacters.slice(0, MAX_CHARACTERS_PER_TURN);
 
     // ── Phase 3: Decide Discussion ──────────────────────────────
@@ -135,8 +150,9 @@ export class HaikuService {
 
     // ── Debug Output (console only, not UI) ─────────────────────
     this.logPlan(roomId, userContent, actions, {
-      characterCount: allCharacters.length,
-      eligibleCount: eligibleCharacters.length,
+      totalCharacters: allCharacters.length,
+      visibleCharacters: visibleCharacters.length,
+      systemCharacters: systemCharacters.length,
       speakingCount: charactersToSpeak.length,
       discussionTriggered: shouldTriggerDiscussion
     });
@@ -364,7 +380,7 @@ export class HaikuService {
     meta: Record<string, unknown>
   ): void {
     console.groupCollapsed(
-      `[Haiku] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['characterCount']} characters | discussion: ${meta['discussionTriggered']}`
+      `[Haiku] Plan → ${actions.length} actions | ${meta['speakingCount']}/${meta['visibleCharacters']} visible (+${meta['systemCharacters']} system) | discussion: ${meta['discussionTriggered']}`
     );
     console.info('roomId', roomId);
     console.info('userContent', userContent.slice(0, 120));
