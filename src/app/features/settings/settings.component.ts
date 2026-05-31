@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { StorageService } from '../../core/storage/storage.service';
 import { WebDavSyncService } from '../../core/storage/webdav-sync.service';
+import { SearchEngine } from '../../core/search/web-search.service';
 import { AppStorageState } from '../../shared/types/chat.types';
 
 interface CustomModel {
@@ -41,6 +42,10 @@ export class SettingsComponent {
   readonly name = signal('');
   readonly location = signal('');
   readonly background = signal('');
+  readonly searchEngine = signal<SearchEngine>('wikipedia');
+  readonly searchApiKey = signal('');
+  readonly searchGoogleCx = signal('');
+  readonly searchCustomUrl = signal('');
   readonly provider = signal(DEFAULT_PROVIDER);
   readonly model = signal(DEFAULT_MODEL);
   readonly temperature = signal(DEFAULT_TEMPERATURE);
@@ -111,7 +116,11 @@ export class SettingsComponent {
       defaultProvider: this.provider(),
       defaultModel: this.model(),
       defaultTemperature: this.temperature(),
-      customModels: this.customModels()
+      customModels: this.customModels(),
+      searchEngine: this.searchEngine(),
+      searchApiKey: this.searchApiKey(),
+      searchGoogleCx: this.searchGoogleCx(),
+      searchCustomUrl: this.searchCustomUrl()
     };
     const nextState: AppStorageState = {
       ...state,
@@ -304,6 +313,10 @@ export class SettingsComponent {
     this.name.set(state.user.name ?? '');
     this.location.set(state.user.location ?? '');
     this.background.set(state.user.background ?? '');
+    this.searchEngine.set((preferences['searchEngine'] as SearchEngine) ?? 'wikipedia');
+    this.searchApiKey.set((preferences['searchApiKey'] as string) ?? '');
+    this.searchGoogleCx.set((preferences['searchGoogleCx'] as string) ?? '');
+    this.searchCustomUrl.set((preferences['searchCustomUrl'] as string) ?? '');
     this.provider.set(preferences.defaultProvider ?? DEFAULT_PROVIDER);
     this.model.set(preferences.defaultModel ?? DEFAULT_MODEL);
     this.temperature.set(

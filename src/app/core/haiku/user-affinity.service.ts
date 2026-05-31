@@ -16,11 +16,11 @@ const NEGATIVE_SIGNALS = [
 
 const BASE_AFFINITY = 0.2;
 const REPLY_BONUS = 0.01;       // Per character reply
-const POSITIVE_BONUS = 0.02;    // Per positive signal (capped per message)
-const NEGATIVE_PENALTY = 0.04;  // Per negative signal (capped per message)
-const MAX_SIGNAL_BONUS = 0.06;  // Max total signal bonus per message
+const POSITIVE_BONUS = 0.01;    // Per positive signal (capped per message)
+const NEGATIVE_PENALTY = 0.03;  // Per negative signal (capped per message)
+const MAX_SIGNAL_BONUS = 0.03;  // Max total signal bonus per message
 const LONG_MESSAGE_BONUS = 0.01; // User long message → engaged
-const NAME_MENTION_BONUS = 0.02; // User mentions character by name
+const NAME_MENTION_BONUS = 0.01; // User mentions character by name
 const DECAY_RATE = 0.01;        // Per turn without interaction
 
 @Injectable({ providedIn: 'root' })

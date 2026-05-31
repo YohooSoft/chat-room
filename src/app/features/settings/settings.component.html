@@ -39,6 +39,82 @@
     </section>
 
     <section class="card">
+      <h2>搜索设置</h2>
+      <p class="card-intro">角色在网络搜索时使用的搜索引擎。Wikipedia 免费且无需配置。</p>
+
+      <label for="searchEngine">搜索引擎</label>
+      <select
+        id="searchEngine"
+        name="searchEngine"
+        [ngModel]="searchEngine()"
+        (ngModelChange)="searchEngine.set($event)"
+      >
+        <option value="wikipedia">Wikipedia（免费，知识查询）</option>
+        <option value="google">Google Search（需 API Key + CX，免费 100次/天）</option>
+        <option value="brave">Brave Search（需 API Key，免费 2000次/月）</option>
+        <option value="custom">自定义搜索 API</option>
+      </select>
+
+      @if (searchEngine() === 'google') {
+        <label for="searchApiKey">Google API Key</label>
+        <input
+          id="searchApiKey"
+          type="password"
+          name="searchApiKey"
+          [ngModel]="searchApiKey()"
+          (ngModelChange)="searchApiKey.set($event)"
+          placeholder="AIza..."
+        />
+        <label for="searchGoogleCx">Search Engine ID (CX)</label>
+        <input
+          id="searchGoogleCx"
+          type="text"
+          name="searchGoogleCx"
+          [ngModel]="searchGoogleCx()"
+          (ngModelChange)="searchGoogleCx.set($event)"
+          placeholder="your-search-engine-id"
+        />
+        <p class="hint">在 <a href="https://programmablesearchengine.google.com/" target="_blank">Google Custom Search</a> 创建引擎获取 CX，在 <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> 创建 API Key。</p>
+      }
+
+      @if (searchEngine() === 'brave') {
+        <label for="searchApiKey">Brave Search API Key</label>
+        <input
+          id="searchApiKey"
+          type="password"
+          name="searchApiKey"
+          [ngModel]="searchApiKey()"
+          (ngModelChange)="searchApiKey.set($event)"
+          placeholder="BSA..."
+        />
+        <p class="hint">在 <a href="https://brave.com/search/api/" target="_blank">brave.com/search/api</a> 免费申请</p>
+      }
+
+      @if (searchEngine() === 'custom') {
+        <label for="searchCustomUrl">搜索端点 URL</label>
+        <input
+          id="searchCustomUrl"
+          type="text"
+          name="searchCustomUrl"
+          [ngModel]="searchCustomUrl()"
+          (ngModelChange)="searchCustomUrl.set($event)"
+          placeholder="https://api.example.com/search?q={{ '{' }}query{{ '}' }}"
+        />
+        <p class="hint">使用 {{ '{' }}query{{ '}' }} 作为搜索词的占位符。返回 JSON 格式。</p>
+
+        <label for="searchApiKey">API Key（可选）</label>
+        <input
+          id="searchApiKey"
+          type="password"
+          name="searchApiKey"
+          [ngModel]="searchApiKey()"
+          (ngModelChange)="searchApiKey.set($event)"
+          placeholder="Bearer Token 或 API Key"
+        />
+      }
+    </section>
+
+    <section class="card">
       <h2>模型偏好</h2>
       <label for="provider">默认 Provider</label>
       <select
