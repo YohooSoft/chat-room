@@ -50,8 +50,11 @@ export class DiscussionEngineService {
         if (!character) continue;
 
         const peers = otherNames.filter((n) => n !== character.name);
+        const positionGuidance = round === 1
+          ? '这是第一轮，你第一个发言——请大胆表达。'
+          : '前面已经有多轮对话了，请不要重复之前的内容——提出新角度，或者深入探讨某个细节，也可以质疑或反驳。';
         const systemMsg = peers.length
-          ? `你是 ${character.name}。这是 AI 对话第 ${round} 轮，你正在与 ${peers.join('、')} 交流。请以 ${character.name} 的身份自然回应，像真人对话一样。${character.personality ? `你的性格：${character.personality}` : ''}`
+          ? `你是 ${character.name}。AI 对话第 ${round} 轮，你正在与 ${peers.join('、')} 交流。像真人聊天一样自然回应——可以加语气词、动作、情绪。${positionGuidance}${character.personality ? ` 你的性格：${character.personality}` : ''}`
           : `你是 ${character.name}。讨论轮次 ${round}。`;
 
         const messages: Array<{ role: Role; content: string }> = [

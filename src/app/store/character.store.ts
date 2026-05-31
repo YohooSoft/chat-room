@@ -7,9 +7,9 @@ import { StorageService } from '../core/storage/storage.service';
 const DEFAULT_CHARACTERS: Character[] = [
   {
     id: 'haiku',
-    name: 'Haiku',
-    personality: '幕后调度者，不参与对话，仅生成执行计划并输出到 Console',
-    background: 'AI Drama Engine 核心调度引擎',
+    name: '看不见的手',
+    personality: '无形的调度者，引导角色多样化表达，避免同质化',
+    background: 'AI Drama Engine 核心调度引擎——看不见的手',
     promptMode: 'auto',
     isSystem: true,
     model: {

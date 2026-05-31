@@ -97,23 +97,30 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Characters (visible only, no cooldown) ──
-    // All room characters speak — each AI model judges its own relevance
-    const charactersToSpeak = this.selectEligibleCharacters(visibleCharacters, roomMessages)
+    // ── Phase 2: Select Characters, randomize first speaker ─────
+    const eligible = this.selectEligibleCharacters(visibleCharacters, roomMessages)
       .slice(0, MAX_CHARACTERS_PER_TURN);
+    // Shuffle so the first responder is random each turn
+    const charactersToSpeak = this.shuffle([...eligible]);
 
     console.info(
-      `[Haiku] 发言角色: ${charactersToSpeak.map((c) => c.name).join(', ') || '(无)'} — 由AI自行判断相关性`
+      `[Haiku] 发言顺序: ${charactersToSpeak.map((c) => c.name).join(' → ')}`
     );
 
     // ── Phase 3: Decide Discussion (2+ characters → AI dialogue) ─
     const shouldTriggerDiscussion = charactersToSpeak.length >= 2;
 
-    // ── Phase 4: Model Calls ────────────────────────────────────
-    // ── Phase 4: Round 1 — each character replies to the USER ──
-    for (const character of charactersToSpeak) {
+    // ── Phase 4: Round 1 — sequential replies to user ───────────
+    // Each character sees their position: first leads, others react
+    for (let i = 0; i < charactersToSpeak.length; i++) {
       if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
-      actions.push(this.buildModelCall(character, context, userContent));
+      const character = charactersToSpeak[i];
+      const positionHint = charactersToSpeak.length >= 2
+        ? (i === 0
+            ? '你是第一个回应用户的。请大胆抛出你的观点，不要保守。'
+            : `你是第 ${i + 1} 个回应的。前面的人已经说过了，请不要重复——可以反驳、补充新角度、或从不同侧面展开。`)
+        : '';
+      actions.push(this.buildModelCall(character, context, userContent, positionHint));
     }
 
     // ── Phase 4b: AI-to-AI discussion (after user replies) ──
@@ -248,10 +255,11 @@ export class HaikuService {
   private buildModelCall(
     character: Character,
     context: Array<{ role: Role; content: string }>,
-    userContent: string
+    userContent: string,
+    positionHint?: string
   ): Extract<Action, { type: 'call_model' }> {
     const messages: Array<{ role: Role; content: string }> = [];
-    const systemPrompt = this.buildSystemPrompt(character);
+    const systemPrompt = this.buildSystemPrompt(character, positionHint);
 
     if (systemPrompt) {
       messages.push({ role: 'system', content: systemPrompt });
@@ -270,6 +278,14 @@ export class HaikuService {
     };
   }
 
+  private shuffle<T>(arr: T[]): T[] {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
   // ── System Prompt Builder ────────────────────────────────────────
 
   /**
@@ -279,35 +295,34 @@ export class HaikuService {
    * Auto mode: constructs from personality + background with a consistent
    * template that ensures role-consistent, natural responses.
    */
-  buildSystemPrompt(character: Character): string {
+  buildSystemPrompt(character: Character, positionHint?: string): string {
     if (character.promptMode === 'advanced' && character.systemPrompt) {
-      return character.systemPrompt;
+      const base = character.systemPrompt;
+      return positionHint ? `${base}\n\n${positionHint}` : base;
     }
 
     const parts: string[] = [];
 
-    // Core identity
     parts.push(`你是「${character.name}」。`);
 
-    // Personality (required)
     if (character.personality) {
-      parts.push(`性格特点：${character.personality}。`);
+      parts.push(`性格：${character.personality}。`);
     }
-
-    // Background (optional but adds depth)
     if (character.background) {
       parts.push(`背景：${character.background}。`);
     }
 
-    // Behavioral guidelines — these are critical for stability
+    // Diversity & natural conversation guidelines
     parts.push(
-      '请严格以这个角色的身份和语气来回应。',
-      '保持角色一致性，不要跳出角色设定。',
-      '回答要简洁有力，避免冗长含糊的表述。',
-      '不要在回复中使用 thinking、think 标签包裹你的思考过程，直接给出最终回复即可。',
-      '如果你不确定如何回应，基于角色的性格特点给出最合理的反应。',
-      '不要重复其他角色已经说过的内容，提出新的视角或补充。'
+      '像正常人聊天一样回应——可以加入语气词、动作描述、停顿，让对话生动自然。',
+      '不要输出论文式的长篇大论，像朋友聊天那样简洁有趣。',
+      '如果有其他人在场，不要重复他们的话——要么提出新观点，要么反驳，要么从另一个角度补充。',
+      '不要使用 thinking、think 标签。'
     );
+
+    if (positionHint) {
+      parts.push(positionHint);
+    }
 
     return parts.join(' ');
   }
