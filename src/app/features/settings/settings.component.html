@@ -1,0 +1,101 @@
+<section class="settings-shell">
+  <header class="page-header">
+    <h1>设置</h1>
+    <p>管理用户信息与默认模型偏好。</p>
+  </header>
+
+  <form class="settings-form" (ngSubmit)="save()">
+    <section class="card">
+      <h2>用户信息</h2>
+      <label for="userName">昵称</label>
+      <input
+        id="userName"
+        type="text"
+        name="userName"
+        [ngModel]="name()"
+        (ngModelChange)="name.set($event)"
+        placeholder="输入你的昵称"
+      />
+    </section>
+
+    <section class="card">
+      <h2>模型偏好</h2>
+      <label for="provider">默认 Provider</label>
+      <select
+        id="provider"
+        name="provider"
+        [ngModel]="provider()"
+        (ngModelChange)="provider.set($event)"
+      >
+        @for (option of providers; track option) {
+          <option [value]="option">{{ option }}</option>
+        }
+      </select>
+
+      <label for="model">默认模型</label>
+      <input
+        id="model"
+        type="text"
+        name="model"
+        [ngModel]="model()"
+        (ngModelChange)="model.set($event)"
+        placeholder="例如 gpt-4o-mini"
+      />
+
+      <label>温度</label>
+      <div class="temperature-row">
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.1"
+          name="temperatureRange"
+          [ngModel]="temperature()"
+          (ngModelChange)="updateTemperature($event)"
+        />
+        <input
+          type="number"
+          min="0"
+          max="1"
+          step="0.1"
+          name="temperatureNumber"
+          [ngModel]="temperature()"
+          (ngModelChange)="updateTemperature($event)"
+        />
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>本地存储概览</h2>
+      <div class="summary-grid">
+        <div>
+          <span>房间</span>
+          <strong>{{ storageSummary().rooms }}</strong>
+        </div>
+        <div>
+          <span>角色</span>
+          <strong>{{ storageSummary().characters }}</strong>
+        </div>
+        <div>
+          <span>消息</span>
+          <strong>{{ storageSummary().messages }}</strong>
+        </div>
+        <div>
+          <span>房间记忆</span>
+          <strong>{{ storageSummary().roomMemories }}</strong>
+        </div>
+        <div>
+          <span>角色记忆</span>
+          <strong>{{ storageSummary().characterMemories }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button type="submit">保存设置</button>
+      @if (savedMessage()) {
+        <span class="saved">{{ savedMessage() }}</span>
+      }
+    </div>
+  </form>
+</section>
