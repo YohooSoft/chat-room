@@ -67,6 +67,7 @@ export class WebSearchService {
 
       this.cache.set(roomId, { result, timestamp: Date.now() });
       console.info(`[WebSearch] 搜索完成 (${roomId}): ${formatted.length} 字符`);
+      console.log('[WebSearch] DuckDuckGo 原始返回:', JSON.stringify(data, null, 2));
       return result;
     } catch (err) {
       clearTimeout(timeout);
