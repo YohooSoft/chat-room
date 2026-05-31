@@ -48,6 +48,75 @@
             <p>{{ summary.memoryCount }} 条剧情记忆</p>
           </div>
         </div>
+
+        <div class="editor-grid">
+          <div class="detail-card">
+            <h3>编辑房间</h3>
+            <label for="roomName">房间名称</label>
+            <input
+              id="roomName"
+              type="text"
+              name="roomName"
+              [ngModel]="editName()"
+              (ngModelChange)="editName.set($event)"
+            />
+            <label>参与角色</label>
+            <div class="checkbox-group">
+              @for (character of characterStore.characters(); track character.id) {
+                <label class="checkbox-item">
+                  <input
+                    type="checkbox"
+                    [checked]="editCharacterIds().includes(character.id)"
+                    (change)="toggleEditCharacter(character.id)"
+                  />
+                  <span>{{ character.name }}</span>
+                </label>
+              }
+            </div>
+            <button
+              type="button"
+              class="primary"
+              [disabled]="!editName().trim()"
+              (click)="saveActiveRoom()"
+            >
+              保存房间
+            </button>
+          </div>
+
+          <div class="detail-card">
+            <h3>新建房间</h3>
+            <label for="newRoomName">房间名称</label>
+            <input
+              id="newRoomName"
+              type="text"
+              name="newRoomName"
+              placeholder="例如 侧舞台"
+              [ngModel]="newRoomName()"
+              (ngModelChange)="newRoomName.set($event)"
+            />
+            <label>参与角色</label>
+            <div class="checkbox-group">
+              @for (character of characterStore.characters(); track character.id) {
+                <label class="checkbox-item">
+                  <input
+                    type="checkbox"
+                    [checked]="newRoomCharacterIds().includes(character.id)"
+                    (change)="toggleNewCharacter(character.id)"
+                  />
+                  <span>{{ character.name }}</span>
+                </label>
+              }
+            </div>
+            <button
+              type="button"
+              class="primary"
+              [disabled]="!newRoomName().trim()"
+              (click)="createRoom()"
+            >
+              创建房间
+            </button>
+          </div>
+        </div>
       }
     </section>
   </div>

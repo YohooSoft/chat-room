@@ -33,10 +33,8 @@ export class SettingsComponent {
   readonly temperature = signal(DEFAULT_TEMPERATURE);
   readonly savedMessage = signal('');
 
-  private readonly storageState = signal<AppStorageState>(this.storageService.read());
-
   readonly storageSummary = computed(() => {
-    const state = this.storageState();
+    const state = this.storageService.state();
     const roomMemories = Object.values(state.memories.room).reduce(
       (total, list) => total + list.length,
       0
@@ -79,7 +77,6 @@ export class SettingsComponent {
       }
     };
     this.storageService.write(nextState);
-    this.storageState.set(nextState);
     this.savedMessage.set(`${SAVE_MESSAGE_PREFIX} ${new Date().toLocaleTimeString('zh-CN')}`);
   }
 
