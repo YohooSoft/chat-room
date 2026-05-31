@@ -23,8 +23,10 @@ export class MarkdownPipe implements PipeTransform {
   }
 
   private render(md: string): string {
-    // 0. Strip thinking blocks (Claude/DeepSeek extended thinking)
-    let text = md.replace(/thinking([\s\S]*?)\/thinking/gi, '');
+    // 0. Strip "Name：Name：" and "Name：" patterns AI copies from context
+    let text = md.replace(/([一-鿿\w]+[：:]){1,3}\s*/g, '');
+    // 0b. Strip thinking blocks (Claude/DeepSeek extended thinking)
+    text = text.replace(/thinking([\s\S]*?)\/thinking/gi, '');
     text = text.replace(/<thinking>([\s\S]*?)<\/thinking>/gi, '');
     text = text.replace(/<think>([\s\S]*?)<\/think>/gi, '');
     text = text.replace(/think([\s\S]*?)\/think/gi, '');

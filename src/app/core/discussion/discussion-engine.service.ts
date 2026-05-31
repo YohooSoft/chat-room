@@ -39,22 +39,25 @@ export class DiscussionEngineService {
     const activeSpeakers = speakers.slice(0, MAX_SPEAKERS_PER_ROUND);
     if (!activeSpeakers.length) return;
 
-    const characterMap = this.characterStore.byId();
-    const otherNames = activeSpeakers
-      .map((id) => characterMap[id]?.name)
-      .filter(Boolean);
+    const otherNames: string[] = activeSpeakers
+      .map((id) => this.characterStore.getCharacter(id)?.name)
+      .filter((n): n is string => !!n);
 
     // ── Build initial context from recent room messages ──────────
     const roomMessages = this.chatStore.messagesForRoom(roomId);
-    const context: Array<{ role: Role; content: string }> = roomMessages
+    const charLookup = this.characterStore.byId();
+    interface ContextEntry { role: Role; content: string; speakerName?: string }
+    const context: ContextEntry[] = roomMessages
       .slice(-8)
       .map((m) => {
-        const name = characterMap[m.senderId]?.name;
+        const name = charLookup[m.senderId]?.name;
+        const clean = m.content
+          .replace(/\[.+?\][：:]\s*/g, '')
+          .replace(/([一-鿿\w]+[：:]){1,3}\s*/g, '');
         return {
-          role: m.role === 'assistant' ? ('assistant' as Role) : ('user' as Role),
-          content: m.senderId === 'user' || !name
-            ? m.content.replace(/\[.+?\][：:]\s*/g, '')
-            : `${name}: ${m.content.replace(/\[.+?\][：:]\s*/g, '')}`
+          role: m.role === 'user' ? ('user' as Role) : ('assistant' as Role),
+          content: clean,
+          speakerName: m.senderId === 'user' ? undefined : name
         };
       });
 
@@ -87,7 +90,7 @@ export class DiscussionEngineService {
   private async runRound(
     speakers: string[],
     otherNames: string[],
-    context: Array<{ role: Role; content: string }>,
+    context: Array<{ role: Role; content: string; speakerName?: string }>,
     round: number,
     userContent: string | undefined,
     roomId: string
@@ -106,14 +109,14 @@ export class DiscussionEngineService {
         const affinityHint = this.affinityGuidance(affinityScore, character.name);
         const positionIndex = speakers.indexOf(speakerId);
         if (positionIndex === 0) {
-          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。如果用户明显是在对别人说话，你可以选择简短回应或保持沉默，不要硬插话。如果是对大家说的或者提到了你，请自然回应。不要说"轮到我了"，不要写动作旁白，不要在消息开头写自己的名字或"XX："格式。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。上方的对话历史中"XX 说："是标注谁说了什么，不是让你模仿的格式。请直接输出你要说的话，不要加任何名字前缀。如果用户明显在对别人说话，你可以保持沉默。禁止：动作旁白、"名字："前缀。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         } else {
           const prevName = speakers
             .slice(0, positionIndex)
             .map((id) => this.characterStore.getCharacter(id)?.name)
             .filter(Boolean)
             .join('、');
-          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。${prevName} 已经回应了（见上文）。如果你觉得用户是在对你或对大家说话，请自然回应；如果明显只对别人说，可以简短带过或保持沉默。不要重复、不要写动作旁白、不要用"名字："格式。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。${prevName} 已经回应了（见上文"XX 说："标注）。请直接输出你要说的话，不要加名字前缀。如果你觉得与自己相关请自然回应，否则可以沉默。禁止：动作旁白、"名字："前缀。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         }
       } else {
         // AI-to-AI — natural group chat
@@ -123,9 +126,18 @@ export class DiscussionEngineService {
         systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。像朋友之间那样自然——可以有语气词、小动作、玩笑、调侃，想到什么说什么。${guidance}${character.personality ? ` 你的性格：${character.personality}` : ''}`;
       }
 
+      // All context messages → role:'user' so AI never confuses them as own speech.
+      // Include speaker name as natural prefix for attribution.
+      const speakerContext = context.map((m) => ({
+        role: 'user' as Role,
+        content: m.speakerName && m.speakerName !== character.name
+          ? `${m.speakerName} 说：${m.content}`
+          : m.content
+      }));
+
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
-        ...context
+        ...speakerContext
       ];
 
       const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
@@ -152,7 +164,8 @@ export class DiscussionEngineService {
       if (fullContent) {
         context.push({
           role: 'assistant' as Role,
-          content: `${character.name}: ${fullContent}`
+          speakerName: character.name,
+          content: fullContent
         });
       }
     }

@@ -97,16 +97,14 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Characters ───────────────────────────────
-    // All room characters get a chance — each AI model decides whether
-    // it's being addressed and should respond
+    // ── Phase 2: Select Characters — all get a chance, AI decides ─
     const charactersToSpeak = this.shuffle(
       this.selectEligibleCharacters(visibleCharacters, roomMessages)
         .slice(0, MAX_CHARACTERS_PER_TURN)
     );
 
     console.info(
-      `[Haiku] 发言顺序: ${charactersToSpeak.map((c) => c.name).join(' → ')}（AI自行判断是否被点名）`
+      `[Haiku] 发言: ${charactersToSpeak.map((c) => c.name).join(' → ')}（AI自行判断是否参与）`
     );
 
     // ── Phase 3+4: Unified discussion queue ──
