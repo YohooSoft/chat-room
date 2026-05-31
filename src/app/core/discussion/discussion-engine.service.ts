@@ -205,29 +205,48 @@ export class DiscussionEngineService {
         }
       }
 
-      // Build system prompt
+      // ── Build system prompt ──────────────────────────────────────
+      // Include message format instructions so the character can clearly
+      // distinguish its own words from those of other characters.
+      const formatHint = `\n\n【消息格式说明】对话历史中：\n- 标注"用户 说："的是用户（真人）的发言\n- 标注"某某 说："的是其他角色的发言\n- 没有标注前缀、直接放在 assistant 角色位置的是你自己之前说过的话\n请据此区分：不要重复别人的观点当作自己的，也不要否认自己刚说过的话。`;
+
       let systemMsg: string;
       if (round === 0) {
         if (positionIndex === 0) {
-          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。请自然回应。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。请自然回应。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
         } else {
           const prevNames = speakers.slice(0, positionIndex)
             .map((id) => this.characterStore.getCharacter(id)?.name).filter(Boolean).join('、');
-          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。${prevNames} 已回应（见上文）。请自然接话。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。${prevNames} 已回应（见上文）。请自然接话。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
         }
       } else {
-        systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。自然交流，像朋友一样。${round === 1 ? '刚聊起来，放轻松。' : '别重复老话题。'}${character.personality ? `\n性格：${character.personality}` : ''}`;
+        systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。自然交流，像朋友一样。${round === 1 ? '刚聊起来，放轻松。' : '别重复老话题。'}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
       }
 
-      // Build messages
+      // Build messages with clear attribution so each character
+      // can tell which messages are its own vs. from others.
+      //
+      // Rules:
+      //  - Own past messages   → role: 'assistant' (native LLM self-recognition)
+      //  - Other speakers      → role: 'user'     prefixed with "角色名 说："
+      //  - Human user messages → role: 'user'     prefixed with "用户 说："
+      //  - System messages     → role: 'system'   (via systemMsg)
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
-        ...context.map((m) => ({
-          role: 'user' as Role,
-          content: m.speakerName && m.speakerName !== character.name
-            ? `${m.speakerName} 说：${m.content}`
-            : m.content
-        }))
+        ...context.map((m) => {
+          const isOwn = m.speakerName === character.name;
+          const isUser = !m.speakerName; // user messages have no speakerName
+
+          if (isOwn) {
+            // Use 'assistant' role so the LLM naturally recognises these as its own output
+            return { role: 'assistant' as Role, content: m.content };
+          }
+          if (isUser) {
+            return { role: 'user' as Role, content: `用户 说：${m.content}` };
+          }
+          // Another character's message
+          return { role: 'user' as Role, content: `${m.speakerName} 说：${m.content}` };
+        })
       ];
 
       // ── Call model ──────────────────────────────────────────
