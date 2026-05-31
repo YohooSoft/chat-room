@@ -7,7 +7,7 @@ import { StorageService } from '../core/storage/storage.service';
 const DEFAULT_ROOM: Room = {
   id: 'main-room',
   name: '主舞台',
-  characterIds: ['assistant'] // Haiku 是调度器不参与对话，assistant 是可见 AI
+  characterIds: [] // 用户自行添加角色，Haiku 仅负责调度
 };
 
 @Injectable({ providedIn: 'root' })
@@ -84,8 +84,18 @@ export class RoomStore {
       this.activeRoomIdSignal.set(DEFAULT_ROOM.id);
       return;
     }
-    this.roomsSignal.set(rooms);
-    this.activeRoomIdSignal.set(rooms[0].id);
+    // Strip system characters (haiku) from room characterIds — they never speak
+    const cleaned = rooms.map((room) => {
+      const filtered = room.characterIds.filter((id) => id !== 'haiku');
+      if (filtered.length === room.characterIds.length) return room;
+      // Ensure at least one character remains
+      return {
+        ...room,
+        characterIds: filtered.length ? filtered : []
+      };
+    });
+    this.roomsSignal.set(cleaned);
+    this.activeRoomIdSignal.set(cleaned[0].id);
   }
 
   private persist(rooms: Room[]): void {

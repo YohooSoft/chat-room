@@ -20,6 +20,13 @@
     </div>
   </header>
 
+  @if (!visibleCharacterCount()) {
+    <div class="hint-banner">
+      <span>当前房间没有可发言角色。</span>
+      <a routerLink="/room">前往房间管理添加角色</a>
+    </div>
+  }
+
   @if (usingMockMode()) {
     <div class="mock-banner">
       <span>⚠️ 未配置 API Key，当前为<strong>模拟模式</strong>。</span>

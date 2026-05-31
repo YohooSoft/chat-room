@@ -93,8 +93,20 @@ export class ChatStore {
 
   private hydrate(): void {
     const state = this.storageService.read();
-    const messages = Object.values(state.messages).flat();
-    this.messagesSignal.set(messages);
+    const allMessages = Object.values(state.messages).flat();
+    // Strip system character (haiku) messages — they don't appear in UI
+    const visible = allMessages.filter((m) => m.senderId !== 'haiku');
+    if (visible.length !== allMessages.length) {
+      // Clean up persisted data — remove haiku messages permanently
+      const cleaned: Record<string, ChatMessage[]> = {};
+      for (const msg of visible) {
+        if (!cleaned[msg.roomId]) cleaned[msg.roomId] = [];
+        cleaned[msg.roomId].push(msg);
+      }
+      state.messages = cleaned;
+      this.storageService.write(state);
+    }
+    this.messagesSignal.set(visible);
   }
 
   private persist(message: ChatMessage): void {

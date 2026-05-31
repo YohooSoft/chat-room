@@ -38,6 +38,10 @@ export class ChatComponent {
   readonly currentMessages = computed(() =>
     this.chatStore.messagesForRoom(this.roomStore.activeRoomId())
   );
+  readonly visibleCharacterCount = computed(() => {
+    const room = this.roomStore.activeRoom();
+    return room.characterIds.filter((id) => id !== 'haiku').length;
+  });
 
   senderName(senderId: string): string {
     if (senderId === 'user') return '你';

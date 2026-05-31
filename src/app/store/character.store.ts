@@ -18,19 +18,6 @@ const DEFAULT_CHARACTERS: Character[] = [
       temperature: 0.7
     },
     relations: {}
-  },
-  {
-    id: 'assistant',
-    name: 'AI 助手',
-    personality: '友好、知识渊博、乐于助人',
-    background: '通用 AI 对话助手',
-    promptMode: 'auto',
-    model: {
-      provider: 'openai',
-      model: 'gpt-4o-mini',
-      temperature: 0.7
-    },
-    relations: {}
   }
 ];
 
@@ -39,7 +26,7 @@ const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
 
 /** System characters that cannot be deleted. */
-const PROTECTED_CHARACTER_IDS = new Set(['haiku', 'assistant']);
+const PROTECTED_CHARACTER_IDS = new Set(['haiku']);
 
 @Injectable({ providedIn: 'root' })
 export class CharacterStore {
@@ -132,7 +119,13 @@ export class CharacterStore {
       this.persist(DEFAULT_CHARACTERS);
       return;
     }
-    this.charactersSignal.set(characters);
+    // Ensure system characters retain their isSystem flag
+    const patched = characters.map((c) =>
+      PROTECTED_CHARACTER_IDS.has(c.id) && c.id === 'haiku'
+        ? { ...c, isSystem: true as const }
+        : c
+    );
+    this.charactersSignal.set(patched);
   }
 
   private persist(characters: Character[]): void {

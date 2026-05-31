@@ -10,6 +10,31 @@
   gap: 1rem;
 }
 
+.hint-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  background: #e3f2fd;
+  border: 1px solid #90caf9;
+  font-size: 0.9rem;
+  color: #0d47a1;
+  flex-wrap: wrap;
+}
+
+.hint-banner a {
+  color: #1565c0;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hint-banner a:hover {
+  text-decoration: underline;
+}
+
 .mock-banner {
   display: flex;
   justify-content: space-between;

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
+import { RoomStore } from '../../store/room.store';
 import { Character, Action, ExecutionPlan, Role } from '../../shared/types/chat.types';
 import { MemoryCompressorService } from '../memory/memory-compressor.service';
 
@@ -37,6 +38,7 @@ export class HaikuService {
   constructor(
     private readonly characterStore: CharacterStore,
     private readonly chatStore: ChatStore,
+    private readonly roomStore: RoomStore,
     private readonly memoryCompressor: MemoryCompressorService
   ) {}
 
@@ -59,9 +61,15 @@ export class HaikuService {
   createPlan(roomId: string, userContent: string): ExecutionPlan {
     const allCharacters = this.characterStore.characters();
 
-    // Split: system characters (Haiku) are scheduler-only, never produce visible msgs
-    const visibleCharacters = allCharacters.filter((c) => !c.isSystem);
+    // System characters (Haiku) are always active as schedulers — not room-dependent
     const systemCharacters = allCharacters.filter((c) => c.isSystem);
+
+    // Visible characters: only those assigned to THIS room may speak
+    const room = this.roomStore.rooms().find((r) => r.id === roomId);
+    const roomCharacterIds = new Set(room?.characterIds ?? []);
+    const visibleCharacters = allCharacters.filter(
+      (c) => !c.isSystem && roomCharacterIds.has(c.id)
+    );
 
     // Log system character activity to console only
     for (const sc of systemCharacters) {
@@ -69,11 +77,14 @@ export class HaikuService {
     }
 
     if (!visibleCharacters.length) {
-      // No visible characters to respond — Haiku only logs to console
-      console.info('[Haiku] 当前房间无可发言角色，仅生成调度日志');
+      // No visible characters — Haiku logs to console, hint in chat
+      console.info('[Haiku] 当前房间无可发言角色。请在 /room 或 /character 中添加角色。');
       return {
         roomId,
-        actions: [{ type: 'ui_event', event: 'typing' }, { type: 'ui_event', event: 'stop_typing' }]
+        actions: [
+          { type: 'ui_event', event: 'typing' },
+          { type: 'ui_event', event: 'stop_typing' }
+        ]
       };
     }
 
