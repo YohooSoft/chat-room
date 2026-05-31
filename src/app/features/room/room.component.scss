@@ -112,6 +112,53 @@
   color: #424242;
 }
 
+.editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.detail-card label {
+  font-weight: 600;
+  color: #455a64;
+  font-size: 0.9rem;
+}
+
+.detail-card input[type='text'] {
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.checkbox-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #546e7a;
+}
+
+.detail-card button.primary {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
+  background: #1565c0;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detail-card button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chip-group {
   display: flex;
   flex-wrap: wrap;

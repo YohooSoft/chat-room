@@ -46,6 +46,12 @@ export class HaikuService {
     actions.push({ type: 'ui_event', event: 'stop_typing' });
     actions.push({ type: 'ui_event', event: 'end_turn' });
 
+    console.groupCollapsed('[Haiku] ExecutionPlan');
+    console.info('roomId', roomId);
+    console.info('userContent', userContent);
+    console.info('actions', actions);
+    console.groupEnd();
+
     return {
       roomId,
       actions

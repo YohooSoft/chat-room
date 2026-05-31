@@ -23,38 +23,113 @@
       @if (selectedCharacter(); as character) {
         <div class="detail-header">
           <div>
-            <h2>{{ character.name }}</h2>
-            <p>{{ character.personality }}</p>
+            <h2>{{ draft().name || character.name }}</h2>
+            <p>{{ draft().personality || character.personality }}</p>
           </div>
-          <span class="badge" [class.advanced]="character.promptMode === 'advanced'">
-            {{ character.promptMode === 'auto' ? '自动提示' : '高级提示' }}
+          <span class="badge" [class.advanced]="draft().promptMode === 'advanced'">
+            {{ draft().promptMode === 'auto' ? '自动提示' : '高级提示' }}
           </span>
         </div>
 
         <div class="detail-grid">
           <div class="detail-card">
-            <h3>角色背景</h3>
-            <p>{{ character.background }}</p>
+            <h3>角色信息</h3>
+            <label>名称</label>
+            <input
+              type="text"
+              name="characterName"
+              [ngModel]="draft().name"
+              (ngModelChange)="updateDraft({ name: $event })"
+            />
+            <label>性格</label>
+            <input
+              type="text"
+              name="characterPersonality"
+              [ngModel]="draft().personality"
+              (ngModelChange)="updateDraft({ personality: $event })"
+            />
+            <label>背景</label>
+            <textarea
+              name="characterBackground"
+              rows="3"
+              [ngModel]="draft().background"
+              (ngModelChange)="updateDraft({ background: $event })"
+            ></textarea>
           </div>
 
           <div class="detail-card">
             <h3>模型配置</h3>
-            <ul>
-              <li>Provider：{{ character.model.provider }}</li>
-              <li>Model：{{ character.model.model }}</li>
-              <li>Temperature：{{ character.model.temperature }}</li>
-            </ul>
+            <label>提示模式</label>
+            <div class="toggle-group">
+              <label class="toggle-item">
+                <input
+                  type="radio"
+                  name="promptMode"
+                  [checked]="draft().promptMode === 'auto'"
+                  (change)="updateDraft({ promptMode: 'auto' })"
+                />
+                自动提示
+              </label>
+              <label class="toggle-item">
+                <input
+                  type="radio"
+                  name="promptMode"
+                  [checked]="draft().promptMode === 'advanced'"
+                  (change)="updateDraft({ promptMode: 'advanced' })"
+                />
+                高级提示
+              </label>
+            </div>
+            <label>Provider</label>
+            <select
+              name="characterProvider"
+              [ngModel]="draft().provider"
+              (ngModelChange)="updateDraft({ provider: $event })"
+            >
+              @for (option of providers; track option) {
+                <option [value]="option">{{ option }}</option>
+              }
+            </select>
+            <label>Model</label>
+            <input
+              type="text"
+              name="characterModel"
+              [ngModel]="draft().model"
+              (ngModelChange)="updateDraft({ model: $event })"
+            />
+            <label>Temperature</label>
+            <div class="temperature-row">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                [ngModel]="draft().temperature"
+                (ngModelChange)="updateTemperature($event)"
+              />
+              <input
+                type="number"
+                min="0"
+                max="1"
+                step="0.1"
+                [ngModel]="draft().temperature"
+                (ngModelChange)="updateTemperature($event)"
+              />
+            </div>
           </div>
 
           <div class="detail-card">
             <h3>系统提示词</h3>
-            <p>
-              @if (character.systemPrompt) {
-                {{ character.systemPrompt }}
-              } @else {
-                当前使用自动提示模板。
-              }
-            </p>
+            @if (draft().promptMode === 'advanced') {
+              <textarea
+                name="systemPrompt"
+                rows="4"
+                [ngModel]="draft().systemPrompt"
+                (ngModelChange)="updateDraft({ systemPrompt: $event })"
+              ></textarea>
+            } @else {
+              <p>当前使用自动提示模板。</p>
+            }
           </div>
 
           <div class="detail-card">
@@ -71,6 +146,51 @@
               <p>暂无角色关系数据。</p>
             }
           </div>
+        </div>
+
+        <div class="actions">
+          <button
+            type="button"
+            class="primary"
+            [disabled]="!draft().name.trim()"
+            (click)="saveCharacter()"
+          >
+            保存角色
+          </button>
+        </div>
+
+        <div class="detail-card create-card">
+          <h3>新建角色</h3>
+          <label>名称</label>
+          <input
+            type="text"
+            name="newCharacterName"
+            placeholder="例如 编剧AI"
+            [ngModel]="newCharacter().name"
+            (ngModelChange)="updateNewCharacter({ name: $event })"
+          />
+          <label>性格</label>
+          <input
+            type="text"
+            name="newCharacterPersonality"
+            [ngModel]="newCharacter().personality"
+            (ngModelChange)="updateNewCharacter({ personality: $event })"
+          />
+          <label>背景</label>
+          <textarea
+            name="newCharacterBackground"
+            rows="2"
+            [ngModel]="newCharacter().background"
+            (ngModelChange)="updateNewCharacter({ background: $event })"
+          ></textarea>
+          <button
+            type="button"
+            class="primary"
+            [disabled]="!newCharacter().name.trim()"
+            (click)="createCharacter()"
+          >
+            创建角色
+          </button>
         </div>
       }
     </section>

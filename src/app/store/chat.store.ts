@@ -2,6 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 
 import { ChatMessage } from '../shared/types/chat.types';
 import { createId } from '../shared/utils/id.util';
+import { StorageService } from '../core/storage/storage.service';
 
 @Injectable({ providedIn: 'root' })
 export class ChatStore {
@@ -11,6 +12,10 @@ export class ChatStore {
   readonly visibleMessages = computed(() =>
     [...this.messagesSignal()].sort((a: ChatMessage, b: ChatMessage) => a.createdAt - b.createdAt)
   );
+
+  constructor(private readonly storageService: StorageService) {
+    this.hydrate();
+  }
 
   addUserMessage(roomId: string, content: string): ChatMessage {
     const message: ChatMessage = {
@@ -23,6 +28,7 @@ export class ChatStore {
     };
 
     this.messagesSignal.update((messages) => [...messages, message]);
+    this.persist(message);
     return message;
   }
 
@@ -37,10 +43,24 @@ export class ChatStore {
     };
 
     this.messagesSignal.update((messages) => [...messages, message]);
+    this.persist(message);
     return message;
   }
 
   messagesForRoom(roomId: string): ChatMessage[] {
     return this.visibleMessages().filter((message: ChatMessage) => message.roomId === roomId);
+  }
+
+  private hydrate(): void {
+    const state = this.storageService.read();
+    const messages = Object.values(state.messages).flat();
+    this.messagesSignal.set(messages);
+  }
+
+  private persist(message: ChatMessage): void {
+    const state = this.storageService.read();
+    const roomMessages = state.messages[message.roomId] ?? [];
+    state.messages[message.roomId] = [...roomMessages, message];
+    this.storageService.write(state);
   }
 }
