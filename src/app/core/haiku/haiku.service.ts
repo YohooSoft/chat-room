@@ -127,11 +127,13 @@ export class HaikuService {
       .slice(0, MAX_CHARACTERS_PER_TURN)
       .map((s) => s.character);
 
-    // Log relevance scores
+    // Log relevance scores with threshold and decision
     if (scored.length) {
+      const passed = scored.filter((s) => s.score >= RELEVANCE_THRESHOLD);
       console.info(
-        '[Haiku] 角色相关性:',
-        scored.map((s) => `${s.character.name}:${s.score.toFixed(2)}`).join(', ')
+        `[Haiku] 角色相关性 (阈值≥${RELEVANCE_THRESHOLD}):`,
+        scored.map((s) => `${s.character.name}:${s.score.toFixed(2)}${s.score >= RELEVANCE_THRESHOLD ? ' ✓' : ' ✗'}`).join(', '),
+        `→ 回复: ${charactersToSpeak.map((c) => c.name).join(', ') || '(无)'}`
       );
     }
 
