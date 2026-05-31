@@ -17,7 +17,9 @@
             <div class="character-name">{{ character.name }}</div>
             <div class="character-meta">
               {{ character.background }}
-              <span class="affinity-badge">{{ affinityLabel(character.id) }}</span>
+              @if (!character.isSystem) {
+                <span class="affinity-badge">{{ affinityLabel(character.id) }}</span>
+              }
             </div>
           </button>
           @if (!characterStore.isProtected(character.id)) {

@@ -48,10 +48,15 @@ export class DiscussionEngineService {
     const roomMessages = this.chatStore.messagesForRoom(roomId);
     const context: Array<{ role: Role; content: string }> = roomMessages
       .slice(-8)
-      .map((m) => ({
-        role: m.role === 'assistant' ? ('assistant' as Role) : ('user' as Role),
-        content: m.senderId === 'user' ? m.content : `[${m.senderId}]: ${m.content}`
-      }));
+      .map((m) => {
+        const name = characterMap[m.senderId]?.name;
+        return {
+          role: m.role === 'assistant' ? ('assistant' as Role) : ('user' as Role),
+          content: m.senderId === 'user' || !name
+            ? m.content.replace(/\[.+?\][：:]\s*/g, '')
+            : `${name}: ${m.content.replace(/\[.+?\][：:]\s*/g, '')}`
+        };
+      });
 
     // ── Round 0: Reply to USER sequentially ─────────────────────
     console.info(`[DiscussionEngine] Round 0 — 回复用户`);
@@ -101,27 +106,26 @@ export class DiscussionEngineService {
         const affinityHint = this.affinityGuidance(affinityScore, character.name);
         const positionIndex = speakers.indexOf(speakerId);
         if (positionIndex === 0) {
-          systemMsg = `你是 ${character.name}。你正在一个群聊中，用户刚刚说：「${userContent || '请回应'}」。你是第一个看到这条消息的人，请用你的风格自然回应。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。如果用户明显是在对别人说话，你可以选择简短回应或保持沉默，不要硬插话。如果是对大家说的或者提到了你，请自然回应。不要说"轮到我了"，不要写动作旁白，不要在消息开头写自己的名字或"XX："格式。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         } else {
           const prevName = speakers
             .slice(0, positionIndex)
             .map((id) => this.characterStore.getCharacter(id)?.name)
             .filter(Boolean)
             .join('、');
-          systemMsg = `你是 ${character.name}。用户说：「${userContent || '请回应'}」。在你之前，${prevName} 已经回复了（见上方）。你现在才看到消息——请像真人聊天一样：可以附和、反驳、补充新角度、或者另起话题。不要复读前面的人。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || ''}」。${prevName} 已经回应了（见上文）。如果你觉得用户是在对你或对大家说话，请自然回应；如果明显只对别人说，可以简短带过或保持沉默。不要重复、不要写动作旁白、不要用"名字："格式。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         }
       } else {
         // AI-to-AI — natural group chat
         const guidance = round === 1
-          ? '大家刚聊起来，放轻松——想到什么说什么。'
-          : `已经聊了 ${round} 轮了——别重复老话题，可以深入细节、换角度、甚至歪楼。`;
+          ? '大家刚开始聊——放轻松，想到什么说什么。'
+          : '已经聊了一会儿了——别重复老话题，可以深入细节、换角度、甚至歪楼。';
         systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。像朋友之间那样自然——可以有语气词、小动作、玩笑、调侃，想到什么说什么。${guidance}${character.personality ? ` 你的性格：${character.personality}` : ''}`;
       }
 
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
-        ...context,
-        { role: 'user' as Role, content: round === 0 ? (userContent || '请回应') : `${character.name}，轮到你了。` }
+        ...context
       ];
 
       const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
@@ -148,7 +152,7 @@ export class DiscussionEngineService {
       if (fullContent) {
         context.push({
           role: 'assistant' as Role,
-          content: `[${character.name}]: ${fullContent}`
+          content: `${character.name}: ${fullContent}`
         });
       }
     }
