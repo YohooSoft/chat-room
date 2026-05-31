@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { Character } from '../../shared/types/chat.types';
 import { CharacterStore } from '../../store/character.store';
@@ -19,6 +19,19 @@ export class CharacterComponent {
     return characters.find((character) => character.id === currentId) ?? characters[0];
   });
 
+  constructor() {
+    effect(() => {
+      const characters = this.characters();
+      const currentId = this.selectedId();
+      if (!characters.length) {
+        return;
+      }
+      if (!currentId || !characters.some((character) => character.id === currentId)) {
+        this.selectedId.set(characters[0].id);
+      }
+    });
+  }
+
   selectCharacter(characterId: string): void {
     this.selectedId.set(characterId);
   }
@@ -27,9 +40,13 @@ export class CharacterComponent {
     return character.id;
   }
 
-  relationEntries(character: Character): Array<{ id: string; closeness: number; trust: number }> {
+  relationEntries(
+    character: Character
+  ): Array<{ id: string; name: string; closeness: number; trust: number }> {
+    const characterMap = this.characterStore.byId();
     return Object.entries(character.relations).map(([id, relation]) => ({
       id,
+      name: characterMap[id]?.name ?? id,
       closeness: relation.closeness,
       trust: relation.trust
     }));

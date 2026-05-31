@@ -23,10 +23,16 @@ export class RoomComponent {
       const characterNames = room.characterIds.map(
         (id) => characterMap[id]?.name ?? id
       );
+      const displayedCharacters = characterNames.slice(0, 3);
+      const remaining = Math.max(0, characterNames.length - displayedCharacters.length);
+      const characterSummary = characterNames.length
+        ? `${displayedCharacters.join(' / ')}${remaining ? ` +${remaining}` : ''}`
+        : '暂无角色';
       return {
         id: room.id,
         name: room.name,
         characterNames,
+        characterSummary,
         characterCount: characterNames.length,
         messageCount: this.chatStore.messagesForRoom(room.id).length,
         memoryCount: this.memoryService.getRoomMemories(room.id).length
