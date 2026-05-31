@@ -12,7 +12,7 @@ import { CharacterStore } from '../../store/character.store';
 export class CharacterComponent {
   readonly characterStore = inject(CharacterStore);
   readonly characters = this.characterStore.characters;
-  readonly selectedId = signal<string>(this.characters()[0]?.id ?? '');
+  readonly selectedId = signal<string>('');
   readonly selectedCharacter = computed(() => {
     const characters = this.characters();
     const currentId = this.selectedId();

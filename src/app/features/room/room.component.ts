@@ -24,7 +24,7 @@ export class RoomComponent {
         (id) => characterMap[id]?.name ?? id
       );
       const displayedCharacters = characterNames.slice(0, 3);
-      const remaining = Math.max(0, characterNames.length - displayedCharacters.length);
+      const remaining = Math.max(0, characterNames.length - 3);
       const characterSummary = characterNames.length
         ? `${displayedCharacters.join(' / ')}${remaining ? ` +${remaining}` : ''}`
         : '暂无角色';
