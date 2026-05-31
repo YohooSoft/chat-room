@@ -56,9 +56,19 @@ export class DiscussionEngineService {
     // ── Build user info string ──────────────────────────────────────
     const userInfo = this.buildUserInfo(userName, userLocation, userBackground);
 
-    // ── Round 0: Sequential — each character decides if they're addressed ──
+    // ── Round 0: Sequential — each character responds to user ─────
     console.info('[DiscussionEngine] Round 0 — 顺序回复用户');
-    await this.runSequentialRound(activeSpeakers, otherNames, context, 0, userContent, userInfo, roomId);
+    const { searchHappened } = await this.runSequentialRound(
+      activeSpeakers, otherNames, context, 0, userContent, userInfo, roomId
+    );
+
+    // If a character searched and presented results, STOP here.
+    // Don't let other characters interrupt the search presentation.
+    if (searchHappened) {
+      console.info('[DiscussionEngine] 搜索已展示，跳过后续轮次');
+      this.webSearchService.clearResults(roomId);
+      return;
+    }
 
     // ── Filter out silent characters for subsequent AI rounds ─────
     const responsiveSpeakers = activeSpeakers.filter((id) => {
@@ -69,7 +79,9 @@ export class DiscussionEngineService {
     if (responsiveSpeakers.length >= 2) {
       for (let round = 1; round <= MAX_AI_ROUNDS; round++) {
         console.info(`[DiscussionEngine] Round ${round}/${MAX_AI_ROUNDS} — AI 自由对话`);
-        await this.runSequentialRound(responsiveSpeakers, otherNames, context, round, undefined, userInfo, roomId);
+        await this.runSequentialRound(
+          responsiveSpeakers, otherNames, context, round, undefined, userInfo, roomId
+        );
       }
       console.info('[DiscussionEngine] 完成，弹窗询问');
       this.uiStore.pauseDiscussion(roomId, speakers);
@@ -94,9 +106,6 @@ export class DiscussionEngineService {
   /**
    * Ask the character's own LLM whether it needs to search the web.
    * Returns a search query string, or null if search is unnecessary.
-   *
-   * This is intentionally a separate, lightweight LLM call so each character
-   * independently decides — not the Haiku scheduler.
    */
   private async decideSearchForCharacter(
     character: { name: string; personality: string; model: { provider: string; model: string } },
@@ -135,7 +144,6 @@ export class DiscussionEngineService {
       console.info(`[DiscussionEngine] ${character.name} 决定不搜索`);
       return null;
     } catch {
-      // Decision LLM call failed — skip search gracefully
       console.warn(`[DiscussionEngine] ${character.name} 搜索决策调用失败，跳过搜索`);
       return null;
     }
@@ -143,7 +151,6 @@ export class DiscussionEngineService {
 
   /**
    * Fast keyword check to avoid unnecessary LLM calls for search decisions.
-   * Only returns true if the user message contains hints that search might help.
    */
   private hasSearchHint(content: string): boolean {
     const triggers = [
@@ -156,6 +163,13 @@ export class DiscussionEngineService {
     return triggers.some(t => lower.includes(t));
   }
 
+  /**
+   * Run one sequential round of character responses.
+   *
+   * Returns `{ searchHappened: true }` if a character searched the web
+   * and presented results — the caller should stop further rounds to
+   * avoid other characters interrupting the search presentation.
+   */
   private async runSequentialRound(
     speakers: string[],
     otherNames: string[],
@@ -164,7 +178,7 @@ export class DiscussionEngineService {
     userContent: string | undefined,
     userInfo: string,
     roomId: string
-  ): Promise<void> {
+  ): Promise<{ searchHappened: boolean }> {
     for (const speakerId of speakers) {
       const character = this.characterStore.getCharacter(speakerId);
       if (!character) continue;
@@ -174,6 +188,7 @@ export class DiscussionEngineService {
 
       // ── Round 0: Character decides if they need web search ─────
       let searchContext = '';
+      let didSearch = false;
       if (round === 0 && userContent) {
         const searchQuery = await this.decideSearchForCharacter(
           { name: character.name, personality: character.personality, model: character.model },
@@ -183,7 +198,9 @@ export class DiscussionEngineService {
         if (searchQuery) {
           const result = await this.webSearchService.search(roomId, searchQuery);
           if (result.formatted) {
-            searchContext = `\n\n以下是从网络搜索到的信息，可供参考：\n${result.formatted}`;
+            // Strong directive: character MUST present the search results to the user
+            searchContext = `\n\n重要：你刚才在网上搜索了「${searchQuery}」，以下是搜索结果。请务必将你查到的关键信息完整地告诉用户，不要只说"我查到了"，而要具体说出查到的内容。可以自然地提及来源：\n${result.formatted}`;
+            didSearch = true;
           }
         }
       }
@@ -202,7 +219,7 @@ export class DiscussionEngineService {
         systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。自然交流，像朋友一样。${round === 1 ? '刚聊起来，放轻松。' : '别重复老话题。'}${character.personality ? `\n性格：${character.personality}` : ''}`;
       }
 
-      // Build messages: all context → role:'user' so AI doesn't confuse identity
+      // Build messages
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
         ...context.map((m) => ({
@@ -229,7 +246,6 @@ export class DiscussionEngineService {
           this.chatStore.appendStreamChunk(messageId, chunk);
         }
 
-        // Finalize only if meaningful response
         if (isTrivial(fullContent)) {
           console.info(`[DiscussionEngine] ${character.name} 沉默（内容过短）`);
         } else {
@@ -246,6 +262,16 @@ export class DiscussionEngineService {
         speakerName: character.name,
         content: fullContent
       });
+
+      // ── If this character searched and presented results, ─────
+      // STOP immediately. No more characters this round.
+      // This ensures the search presentation is not interrupted.
+      if (didSearch && !isTrivial(fullContent)) {
+        console.info(`[DiscussionEngine] ${character.name} 已展示搜索结果，停止本轮后续角色`);
+        return { searchHappened: true };
+      }
     }
+
+    return { searchHappened: false };
   }
 }
