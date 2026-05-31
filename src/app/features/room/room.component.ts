@@ -111,6 +111,10 @@ export class RoomComponent {
     this.roomStore.setActiveRoom(room.id);
   }
 
+  deleteRoom(roomId: string): void {
+    this.roomStore.deleteRoom(roomId);
+  }
+
   trackById(_index: number, room: { id: string }): string {
     return room.id;
   }

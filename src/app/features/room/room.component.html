@@ -7,20 +7,28 @@
   <div class="room-layout">
     <aside class="room-list">
       @for (room of roomSummaries(); track trackById($index, room)) {
-        <button
-          type="button"
-          class="room-item"
-          [class.active]="room.id === roomStore.activeRoomId()"
-          (click)="setActiveRoom(room.id)"
-        >
-          <div class="room-title">{{ room.name }}</div>
-          <div class="room-meta">
-            <span>角色 {{ room.characterCount }}</span>
-            <span>消息 {{ room.messageCount }}</span>
-            <span>记忆 {{ room.memoryCount }}</span>
-          </div>
-          <div class="room-characters">{{ room.characterSummary }}</div>
-        </button>
+        <div class="room-item-wrapper">
+          <button
+            type="button"
+            class="room-item"
+            [class.active]="room.id === roomStore.activeRoomId()"
+            (click)="setActiveRoom(room.id)"
+          >
+            <div class="room-title">{{ room.name }}</div>
+            <div class="room-meta">
+              <span>角色 {{ room.characterCount }}</span>
+              <span>消息 {{ room.messageCount }}</span>
+              <span>记忆 {{ room.memoryCount }}</span>
+            </div>
+            <div class="room-characters">{{ room.characterSummary }}</div>
+          </button>
+          <button
+            type="button"
+            class="delete-btn"
+            title="删除房间"
+            (click)="$event.stopPropagation(); deleteRoom(room.id)"
+          >×</button>
+        </div>
       }
     </aside>
 

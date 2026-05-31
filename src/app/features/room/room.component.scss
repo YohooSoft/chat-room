@@ -21,6 +21,34 @@
   gap: 0.75rem;
 }
 
+.room-item-wrapper {
+  display: flex;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+
+.room-item-wrapper .room-item {
+  flex: 1;
+}
+
+.delete-btn {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0 0.6rem;
+  background: #ffffff;
+  color: #bdbdbd;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.delete-btn:hover {
+  color: #d32f2f;
+  border-color: #d32f2f;
+  background: #ffebee;
+}
+
 .room-item {
   border: 1px solid #e0e0e0;
   border-radius: 12px;

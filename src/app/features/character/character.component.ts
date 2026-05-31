@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 
 import { Character } from '../../shared/types/chat.types';
 import { CharacterStore } from '../../store/character.store';
+import { StorageService } from '../../core/storage/storage.service';
 
 interface CharacterForm {
   name: string;
@@ -19,6 +20,12 @@ interface NewCharacterForm {
   name: string;
   personality: string;
   background: string;
+}
+
+interface RelationEditor {
+  targetId: string;
+  closeness: number;
+  trust: number;
 }
 
 const DEFAULT_FORM: CharacterForm = {
@@ -38,6 +45,12 @@ const DEFAULT_NEW_FORM: NewCharacterForm = {
   background: ''
 };
 
+const DEFAULT_RELATION_EDITOR: RelationEditor = {
+  targetId: '',
+  closeness: 0.5,
+  trust: 0.5
+};
+
 @Component({
   selector: 'app-character',
   standalone: true,
@@ -47,11 +60,14 @@ const DEFAULT_NEW_FORM: NewCharacterForm = {
 })
 export class CharacterComponent {
   readonly characterStore = inject(CharacterStore);
+  private readonly storageService = inject(StorageService);
   readonly characters = this.characterStore.characters;
   readonly selectedId = signal<string>('');
   readonly draft = signal<CharacterForm>(DEFAULT_FORM);
   readonly newCharacter = signal<NewCharacterForm>(DEFAULT_NEW_FORM);
   readonly providers = ['openai', 'claude', 'gemini', 'openai-compatible'];
+  readonly relationEditor = signal<RelationEditor>({ ...DEFAULT_RELATION_EDITOR });
+  readonly editingRelation = signal<string>('');
   readonly selectedCharacter = computed(() => {
     const characters = this.characters();
     const currentId = this.selectedId();
@@ -59,6 +75,21 @@ export class CharacterComponent {
       return undefined;
     }
     return characters.find((character) => character.id === currentId) ?? characters[0];
+  });
+  readonly availableTargets = computed(() => {
+    const selected = this.selectedCharacter();
+    return this.characters().filter(
+      (c) => c.id !== (selected?.id ?? '')
+    );
+  });
+  readonly modelSuggestions = computed(() => {
+    const state = this.storageService.state();
+    const customModels = (state.user.preferences as Record<string, unknown>)
+      ?.['customModels'] as Array<{ provider: string; model: string }> | undefined;
+    const list = customModels ?? [];
+    return list
+      .filter((m) => m.provider === this.draft().provider)
+      .map((m) => m.model);
   });
 
   constructor() {
@@ -141,6 +172,91 @@ export class CharacterComponent {
     });
     this.newCharacter.set(DEFAULT_NEW_FORM);
     this.selectedId.set(character.id);
+  }
+
+  deleteCharacter(characterId: string): void {
+    this.characterStore.deleteCharacter(characterId);
+    if (this.selectedId() === characterId) {
+      const characters = this.characterStore.characters();
+      this.selectedId.set(characters.length ? characters[0].id : '');
+    }
+  }
+
+  startAddRelation(): void {
+    this.relationEditor.set({ ...DEFAULT_RELATION_EDITOR });
+    this.editingRelation.set('');
+  }
+
+  startEditRelation(targetId: string): void {
+    const character = this.selectedCharacter();
+    const existing = character?.relations[targetId];
+    if (!existing) {
+      return;
+    }
+    this.relationEditor.set({
+      targetId,
+      closeness: existing.closeness,
+      trust: existing.trust
+    });
+    this.editingRelation.set(targetId);
+  }
+
+  cancelRelationEdit(): void {
+    this.editingRelation.set('');
+  }
+
+  saveRelation(): void {
+    const character = this.selectedCharacter();
+    const editor = this.relationEditor();
+    if (!character || !editor.targetId.trim()) {
+      return;
+    }
+    const nextRelations = { ...character.relations };
+    nextRelations[editor.targetId] = {
+      closeness: Math.min(1, Math.max(0, editor.closeness)),
+      trust: Math.min(1, Math.max(0, editor.trust))
+    };
+    this.characterStore.updateCharacter(character.id, { relations: nextRelations });
+    this.cancelRelationEdit();
+  }
+
+  deleteRelation(targetId: string): void {
+    const character = this.selectedCharacter();
+    if (!character) {
+      return;
+    }
+    const nextRelations = { ...character.relations };
+    delete nextRelations[targetId];
+    this.characterStore.updateCharacter(character.id, { relations: nextRelations });
+    if (this.editingRelation() === targetId) {
+      this.cancelRelationEdit();
+    }
+  }
+
+  updateRelationTarget(targetId: string): void {
+    this.relationEditor.update((current) => ({ ...current, targetId }));
+  }
+
+  updateRelationCloseness(value: string): void {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) {
+      return;
+    }
+    this.relationEditor.update((current) => ({
+      ...current,
+      closeness: Math.min(1, Math.max(0, numeric))
+    }));
+  }
+
+  updateRelationTrust(value: string): void {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) {
+      return;
+    }
+    this.relationEditor.update((current) => ({
+      ...current,
+      trust: Math.min(1, Math.max(0, numeric))
+    }));
   }
 
   updateTemperature(value: string): void {

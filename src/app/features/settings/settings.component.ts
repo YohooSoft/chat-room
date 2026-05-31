@@ -4,10 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { StorageService } from '../../core/storage/storage.service';
 import { AppStorageState } from '../../shared/types/chat.types';
 
+interface CustomModel {
+  provider: string;
+  model: string;
+}
+
 interface UserPreferences extends Record<string, unknown> {
   defaultProvider?: string;
   defaultModel?: string;
   defaultTemperature?: number;
+  customModels?: CustomModel[];
 }
 
 const SAVE_MESSAGE_PREFIX = '已保存';
@@ -32,6 +38,24 @@ export class SettingsComponent {
   readonly model = signal(DEFAULT_MODEL);
   readonly temperature = signal(DEFAULT_TEMPERATURE);
   readonly savedMessage = signal('');
+
+  // Model management
+  readonly customModels = signal<CustomModel[]>([]);
+  readonly modelSearch = signal('');
+  readonly newModelProvider = signal(DEFAULT_PROVIDER);
+  readonly newModelName = signal('');
+
+  readonly filteredModels = computed(() => {
+    const search = this.modelSearch().toLowerCase().trim();
+    if (!search) {
+      return this.customModels();
+    }
+    return this.customModels().filter(
+      (m) =>
+        m.model.toLowerCase().includes(search) ||
+        m.provider.toLowerCase().includes(search)
+    );
+  });
 
   readonly storageSummary = computed(() => {
     const state = this.storageService.state();
@@ -66,7 +90,8 @@ export class SettingsComponent {
       ...(state.user.preferences as UserPreferences),
       defaultProvider: this.provider(),
       defaultModel: this.model(),
-      defaultTemperature: this.temperature()
+      defaultTemperature: this.temperature(),
+      customModels: this.customModels()
     };
     const nextState: AppStorageState = {
       ...state,
@@ -80,6 +105,33 @@ export class SettingsComponent {
     this.savedMessage.set(`${SAVE_MESSAGE_PREFIX} ${new Date().toLocaleTimeString('zh-CN')}`);
   }
 
+  // Model management methods
+  addModel(): void {
+    const modelName = this.newModelName().trim();
+    if (!modelName) {
+      return;
+    }
+    const exists = this.customModels().some(
+      (m) => m.provider === this.newModelProvider() && m.model === modelName
+    );
+    if (exists) {
+      return;
+    }
+    this.customModels.update((models) => [
+      ...models,
+      { provider: this.newModelProvider(), model: modelName }
+    ]);
+    this.newModelName.set('');
+  }
+
+  removeModel(index: number): void {
+    this.customModels.update((models) => {
+      const next = [...models];
+      next.splice(index, 1);
+      return next;
+    });
+  }
+
   updateTemperature(value: string): void {
     const numeric = Number(value);
     if (Number.isNaN(numeric)) {
@@ -87,6 +139,11 @@ export class SettingsComponent {
     }
     const clamped = Math.min(1, Math.max(0, numeric));
     this.temperature.set(clamped);
+  }
+
+  resetAllData(): void {
+    this.storageService.clear();
+    window.location.reload();
   }
 
   private load(): void {
@@ -100,5 +157,6 @@ export class SettingsComponent {
         ? preferences.defaultTemperature
         : DEFAULT_TEMPERATURE
     );
+    this.customModels.set(preferences.customModels ?? []);
   }
 }

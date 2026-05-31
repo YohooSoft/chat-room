@@ -25,6 +25,34 @@
   gap: 0.75rem;
 }
 
+.character-item-wrapper {
+  display: flex;
+  gap: 0.25rem;
+  align-items: stretch;
+}
+
+.character-item-wrapper .character-item {
+  flex: 1;
+}
+
+.delete-btn {
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0 0.6rem;
+  background: #ffffff;
+  color: #bdbdbd;
+  font-size: 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.delete-btn:hover {
+  color: #d32f2f;
+  border-color: #d32f2f;
+  background: #ffebee;
+}
+
 .character-item {
   text-align: left;
   border: 1px solid #e0e0e0;
@@ -187,6 +215,137 @@
 .create-card {
   display: grid;
   gap: 0.75rem;
+}
+
+.relation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.relation-item {
+  border: 1px solid #f1f1f1;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  background: #ffffff;
+}
+
+.relation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.relation-name {
+  font-weight: 600;
+  color: #37474f;
+}
+
+.relation-values {
+  color: #607d8b;
+  font-size: 0.9rem;
+}
+
+.relation-row-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.icon-btn {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 0.15rem 0.5rem;
+  background: #ffffff;
+  color: #78909c;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.icon-btn:hover {
+  border-color: #1565c0;
+  color: #1565c0;
+}
+
+.icon-btn.danger:hover {
+  border-color: #d32f2f;
+  color: #d32f2f;
+  background: #ffebee;
+}
+
+.relation-editor-inline {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.relation-target-name {
+  font-weight: 600;
+  color: #37474f;
+}
+
+.relation-editor-inline label {
+  font-size: 0.85rem;
+  color: #607d8b;
+}
+
+.relation-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-relation-section {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f1f1;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.add-relation-section h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #546e7a;
+}
+
+.add-relation-section label {
+  font-size: 0.85rem;
+  color: #607d8b;
+}
+
+.add-relation-section select {
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.primary.small {
+  padding: 0.35rem 1rem;
+  font-size: 0.9rem;
+}
+
+.ghost.small {
+  border: 1px solid #e0e0e0;
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+  background: #ffffff;
+  font-size: 0.9rem;
+  color: #607d8b;
+  cursor: pointer;
+}
+
+.ghost.small:hover {
+  border-color: #9e9e9e;
+}
+
+.empty-hint {
+  margin: 0;
+  color: #9e9e9e;
+  font-size: 0.9rem;
 }
 
 @media (max-width: 900px) {

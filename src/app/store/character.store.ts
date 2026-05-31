@@ -86,6 +86,32 @@ export class CharacterStore {
     this.persist(nextCharacters);
   }
 
+  deleteCharacter(characterId: string): void {
+    const nextCharacters = this.charactersSignal().filter(
+      (character) => character.id !== characterId
+    );
+    if (nextCharacters.length === 0) {
+      const fallback: Character = {
+        id: createId(),
+        name: '默认角色',
+        personality: '待补充',
+        background: '',
+        promptMode: 'auto',
+        model: {
+          provider: DEFAULT_PROVIDER,
+          model: DEFAULT_MODEL,
+          temperature: DEFAULT_TEMPERATURE
+        },
+        relations: {}
+      };
+      this.charactersSignal.set([fallback]);
+      this.persist([fallback]);
+      return;
+    }
+    this.charactersSignal.set(nextCharacters);
+    this.persist(nextCharacters);
+  }
+
   private hydrate(): void {
     const state = this.storageService.read();
     const characters = Object.values(state.characters);

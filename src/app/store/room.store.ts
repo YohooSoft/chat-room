@@ -53,6 +53,27 @@ export class RoomStore {
     this.persist(nextRooms);
   }
 
+  deleteRoom(roomId: string): void {
+    const nextRooms = this.roomsSignal().filter((room) => room.id !== roomId);
+    if (nextRooms.length === 0) {
+      // Keep at least one room — re-seed with default
+      const fallback: Room = {
+        ...DEFAULT_ROOM,
+        id: createId(),
+        name: '主舞台'
+      };
+      this.roomsSignal.set([fallback]);
+      this.persist([fallback]);
+      this.activeRoomIdSignal.set(fallback.id);
+      return;
+    }
+    this.roomsSignal.set(nextRooms);
+    this.persist(nextRooms);
+    if (this.activeRoomIdSignal() === roomId) {
+      this.activeRoomIdSignal.set(nextRooms[0].id);
+    }
+  }
+
   private hydrate(): void {
     const state = this.storageService.read();
     const rooms = Object.values(state.rooms);

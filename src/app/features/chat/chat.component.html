@@ -1,8 +1,59 @@
 <section class="chat-shell">
-  <header>
-    <h1>AI Drama Engine</h1>
-    <p>{{ roomStore.activeRoom().name }}</p>
+  <header class="chat-header">
+    <div>
+      <h1>AI Drama Engine</h1>
+      <div class="room-bar">
+        <select
+          name="roomSelector"
+          [ngModel]="roomStore.activeRoomId()"
+          (ngModelChange)="switchRoom($event)"
+          class="room-selector"
+        >
+          @for (room of roomStore.rooms(); track room.id) {
+            <option [value]="room.id">{{ room.name }}</option>
+          }
+        </select>
+        <button type="button" class="new-room-btn" (click)="toggleCreateRoom()">
+          {{ showCreateRoom() ? '取消' : '+ 新房间' }}
+        </button>
+      </div>
+    </div>
   </header>
+
+  @if (showCreateRoom()) {
+    <div class="create-room-inline">
+      <h3>创建新房间</h3>
+      <div class="create-room-row">
+        <input
+          type="text"
+          name="newRoomName"
+          placeholder="房间名称"
+          [ngModel]="newRoomName()"
+          (ngModelChange)="newRoomName.set($event)"
+        />
+        <button
+          type="button"
+          class="primary"
+          [disabled]="!newRoomName().trim()"
+          (click)="createRoom()"
+        >
+          创建
+        </button>
+      </div>
+      <div class="checkbox-group">
+        @for (character of characterStore.characters(); track character.id) {
+          <label class="checkbox-item">
+            <input
+              type="checkbox"
+              [checked]="newRoomCharacterIds().includes(character.id)"
+              (change)="toggleNewRoomCharacter(character.id)"
+            />
+            <span>{{ character.name }}</span>
+          </label>
+        }
+      </div>
+    </div>
+  }
 
   <main class="message-list">
     @for (message of currentMessages(); track trackById($index, message)) {

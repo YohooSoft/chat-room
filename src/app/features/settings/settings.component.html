@@ -66,6 +66,78 @@
     </section>
 
     <section class="card">
+      <h2>模型管理</h2>
+      <p class="card-intro">添加自定义模型，供角色编辑器选用。</p>
+
+      <div class="add-model-row">
+        <select
+          name="newModelProvider"
+          [ngModel]="newModelProvider()"
+          (ngModelChange)="newModelProvider.set($event)"
+        >
+          @for (option of providers; track option) {
+            <option [value]="option">{{ option }}</option>
+          }
+        </select>
+        <input
+          type="text"
+          name="newModelName"
+          placeholder="模型名称，例如 gpt-4o"
+          [ngModel]="newModelName()"
+          (ngModelChange)="newModelName.set($event)"
+        />
+        <button
+          type="button"
+          class="primary small"
+          [disabled]="!newModelName().trim()"
+          (click)="addModel()"
+        >
+          添加
+        </button>
+      </div>
+
+      <label for="modelSearch">搜索模型</label>
+      <input
+        id="modelSearch"
+        type="text"
+        name="modelSearch"
+        placeholder="搜索 provider 或模型名称"
+        [ngModel]="modelSearch()"
+        (ngModelChange)="modelSearch.set($event)"
+      />
+
+      <div class="model-list">
+        @if (filteredModels().length) {
+          <div class="model-table-header">
+            <span>Provider</span>
+            <span>Model</span>
+            <span></span>
+          </div>
+          @for (model of filteredModels(); track model.provider + ':' + model.model; let i = $index) {
+            <div class="model-row">
+              <span class="model-provider">{{ model.provider }}</span>
+              <span class="model-name">{{ model.model }}</span>
+              <button
+                type="button"
+                class="icon-btn danger"
+                title="删除模型"
+                (click)="removeModel(i)"
+              >×</button>
+            </div>
+          }
+        } @else {
+          <p class="empty-hint">
+            @if (modelSearch()) {
+              没有匹配 "{{ modelSearch() }}" 的模型。
+            } @else {
+              暂无自定义模型，添加一个开始使用。
+            }
+          </p>
+        }
+      </div>
+    </section>
+
+    <section class="card">
       <h2>本地存储概览</h2>
       <div class="summary-grid">
         <div>
@@ -97,5 +169,11 @@
         <span class="saved">{{ savedMessage() }}</span>
       }
     </div>
+
+    <section class="card danger-zone">
+      <h2>数据管理</h2>
+      <p>清除所有本地存储的数据，包括房间、角色、消息和记忆。此操作不可撤销。</p>
+      <button type="button" class="danger-btn" (click)="resetAllData()">清除所有数据</button>
+    </section>
   </form>
 </section>

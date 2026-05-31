@@ -10,6 +10,108 @@
   gap: 1rem;
 }
 
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.chat-header h1 {
+  margin: 0 0 0.25rem;
+}
+
+.room-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.room-selector {
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.95rem;
+  background: #ffffff;
+  color: #37474f;
+  cursor: pointer;
+}
+
+.new-room-btn {
+  border: 1px solid #1565c0;
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  background: #e3f2fd;
+  color: #1565c0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s;
+}
+
+.new-room-btn:hover {
+  background: #1565c0;
+  color: #ffffff;
+}
+
+.create-room-inline {
+  border: 1px solid #e0e0e0;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  background: #fafafa;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.create-room-inline h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #37474f;
+}
+
+.create-room-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.create-room-row input {
+  flex: 1;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+.create-room-row .primary {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1.4rem;
+  background: #1565c0;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.create-room-row .primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  color: #546e7a;
+}
+
 .message-list {
   min-height: 320px;
   border: 1px solid #d9d9d9;

@@ -7,15 +7,23 @@
   <div class="character-layout">
     <aside class="character-list">
       @for (character of characters(); track trackById($index, character)) {
-        <button
-          type="button"
-          class="character-item"
-          [class.active]="character.id === selectedId()"
-          (click)="selectCharacter(character.id)"
-        >
-          <div class="character-name">{{ character.name }}</div>
-          <div class="character-meta">{{ character.background }}</div>
-        </button>
+        <div class="character-item-wrapper">
+          <button
+            type="button"
+            class="character-item"
+            [class.active]="character.id === selectedId()"
+            (click)="selectCharacter(character.id)"
+          >
+            <div class="character-name">{{ character.name }}</div>
+            <div class="character-meta">{{ character.background }}</div>
+          </button>
+          <button
+            type="button"
+            class="delete-btn"
+            title="删除角色"
+            (click)="$event.stopPropagation(); deleteCharacter(character.id)"
+          >×</button>
+        </div>
       }
     </aside>
 
@@ -96,7 +104,13 @@
               name="characterModel"
               [ngModel]="draft().model"
               (ngModelChange)="updateDraft({ model: $event })"
+              [attr.list]="'modelSuggestions-' + draft().provider"
             />
+            <datalist [id]="'modelSuggestions-' + draft().provider">
+              @for (suggestion of modelSuggestions(); track suggestion) {
+                <option [value]="suggestion"></option>
+              }
+            </datalist>
             <label>Temperature</label>
             <div class="temperature-row">
               <input
@@ -133,17 +147,106 @@
           </div>
 
           <div class="detail-card">
-            <h3>关系概览</h3>
+            <h3>角色关系</h3>
             @if (relationEntries(character).length) {
-              <ul>
+              <ul class="relation-list">
                 @for (relation of relationEntries(character); track relation.id) {
-                  <li>
-                    {{ relation.name }}：亲密度 {{ relation.closeness }}，信任度 {{ relation.trust }}
+                  <li class="relation-item">
+                    @if (editingRelation() === relation.id) {
+                      <div class="relation-editor-inline">
+                        <span class="relation-target-name">{{ relation.name }}</span>
+                        <label>亲密度 {{ relationEditor().closeness }}</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          [ngModel]="relationEditor().closeness"
+                          (ngModelChange)="updateRelationCloseness($event)"
+                        />
+                        <label>信任度 {{ relationEditor().trust }}</label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.05"
+                          [ngModel]="relationEditor().trust"
+                          (ngModelChange)="updateRelationTrust($event)"
+                        />
+                        <div class="relation-editor-actions">
+                          <button type="button" class="primary small" (click)="saveRelation()">保存</button>
+                          <button type="button" class="ghost small" (click)="cancelRelationEdit()">取消</button>
+                        </div>
+                      </div>
+                    } @else {
+                      <div class="relation-row">
+                        <span class="relation-name">{{ relation.name }}</span>
+                        <span class="relation-values"
+                          >亲密度 {{ relation.closeness }} / 信任度 {{ relation.trust }}</span
+                        >
+                        <div class="relation-row-actions">
+                          <button
+                            type="button"
+                            class="icon-btn"
+                            title="编辑关系"
+                            (click)="startEditRelation(relation.id)"
+                          >✎</button>
+                          <button
+                            type="button"
+                            class="icon-btn danger"
+                            title="删除关系"
+                            (click)="deleteRelation(relation.id)"
+                          >×</button>
+                        </div>
+                      </div>
+                    }
                   </li>
                 }
               </ul>
             } @else {
-              <p>暂无角色关系数据。</p>
+              <p class="empty-hint">暂无角色关系数据。</p>
+            }
+
+            @if (!editingRelation()) {
+              <div class="add-relation-section">
+                <h4>添加关系</h4>
+                <select
+                  name="relationTarget"
+                  [ngModel]="relationEditor().targetId"
+                  (ngModelChange)="updateRelationTarget($event)"
+                >
+                  <option value="" disabled>选择角色...</option>
+                  @for (target of availableTargets(); track target.id) {
+                    <option [value]="target.id">{{ target.name }}</option>
+                  }
+                </select>
+                <label>亲密度 {{ relationEditor().closeness }}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  [ngModel]="relationEditor().closeness"
+                  (ngModelChange)="updateRelationCloseness($event)"
+                />
+                <label>信任度 {{ relationEditor().trust }}</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  [ngModel]="relationEditor().trust"
+                  (ngModelChange)="updateRelationTrust($event)"
+                />
+                <button
+                  type="button"
+                  class="primary small"
+                  [disabled]="!relationEditor().targetId"
+                  (click)="saveRelation()"
+                >
+                  添加关系
+                </button>
+              </div>
             }
           </div>
         </div>

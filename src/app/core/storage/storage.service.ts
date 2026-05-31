@@ -42,6 +42,27 @@ export class StorageService {
   private readonly stateSignal = signal<AppStorageState>(this.readFromStorage());
   readonly state = this.stateSignal.asReadonly();
 
+  constructor() {
+    // Cross-tab sync: listen for localStorage changes from other tabs
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', (event: StorageEvent) => {
+        if (event.key !== STORAGE_KEY) {
+          return;
+        }
+        if (event.newValue === null) {
+          this.stateSignal.set(mergeState({}));
+          return;
+        }
+        try {
+          const parsed = JSON.parse(event.newValue) as Partial<AppStorageState>;
+          this.stateSignal.set(mergeState(parsed));
+        } catch {
+          this.stateSignal.set(mergeState({}));
+        }
+      });
+    }
+  }
+
   read(): AppStorageState {
     const state = this.readFromStorage();
     this.stateSignal.set(state);
@@ -51,6 +72,11 @@ export class StorageService {
   write(state: AppStorageState): void {
     this.stateSignal.set(structuredClone(state));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  clear(): void {
+    localStorage.removeItem(STORAGE_KEY);
+    this.stateSignal.set(mergeState({}));
   }
 
   private readFromStorage(): AppStorageState {

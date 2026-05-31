@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { EventBusService } from '../../core/event-bus/event-bus.service';
 import { ChatOrchestratorService } from '../../core/engine/chat-orchestrator.service';
 import { ChatStore } from '../../store/chat.store';
+import { CharacterStore } from '../../store/character.store';
 import { RoomStore } from '../../store/room.store';
 import { UiStore } from '../../store/ui.store';
 
@@ -18,16 +19,53 @@ export class ChatComponent {
   readonly roomStore = inject(RoomStore);
   readonly chatStore = inject(ChatStore);
   readonly uiStore = inject(UiStore);
+  readonly characterStore = inject(CharacterStore);
 
   private readonly eventBus = inject(EventBusService);
   private readonly orchestrator = inject(ChatOrchestratorService);
 
   readonly input = signal('');
   readonly typingLabel = '系统';
-  readonly currentMessages = computed(() => this.chatStore.messagesForRoom(this.roomStore.activeRoomId()));
+  readonly showCreateRoom = signal(false);
+  readonly newRoomName = signal('');
+  readonly newRoomCharacterIds = signal<string[]>([]);
+  readonly currentMessages = computed(() =>
+    this.chatStore.messagesForRoom(this.roomStore.activeRoomId())
+  );
 
   constructor() {
     this.orchestrator.init();
+  }
+
+  switchRoom(roomId: string): void {
+    this.roomStore.setActiveRoom(roomId);
+  }
+
+  toggleCreateRoom(): void {
+    const show = !this.showCreateRoom();
+    this.showCreateRoom.set(show);
+    if (show) {
+      this.newRoomName.set('');
+      this.newRoomCharacterIds.set([...this.roomStore.activeRoom().characterIds]);
+    }
+  }
+
+  toggleNewRoomCharacter(characterId: string): void {
+    this.newRoomCharacterIds.update((current) =>
+      current.includes(characterId)
+        ? current.filter((id) => id !== characterId)
+        : [...current, characterId]
+    );
+  }
+
+  createRoom(): void {
+    const name = this.newRoomName().trim();
+    if (!name) {
+      return;
+    }
+    const room = this.roomStore.createRoom(name, this.newRoomCharacterIds());
+    this.showCreateRoom.set(false);
+    this.roomStore.setActiveRoom(room.id);
   }
 
   submit(): void {
