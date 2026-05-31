@@ -1,10 +1,11 @@
 <section class="room-shell">
   <header class="page-header">
     <h1>房间管理</h1>
-    <p>切换不同剧情舞台，查看角色与记忆概况。</p>
+    <p>动态管理每个舞台的角色阵容，实时生效。</p>
   </header>
 
   <div class="room-layout">
+    <!-- ── Room List Sidebar ────────────────────────────────────── -->
     <aside class="room-list">
       @for (room of roomSummaries(); track trackById($index, room)) {
         <div class="room-item-wrapper">
@@ -32,98 +33,168 @@
       }
     </aside>
 
+    <!-- ── Active Room Detail ──────────────────────────────────── -->
     <section class="room-detail">
       @if (activeSummary(); as summary) {
+        <!-- Room header with inline name edit -->
         <div class="detail-header">
-          <h2>{{ summary.name }}</h2>
-          <span class="tag">当前房间</span>
+          <div class="detail-title-row">
+            <h2>{{ activeRoom().name || summary.name }}</h2>
+            <span class="tag">当前房间</span>
+          </div>
+          <div class="room-name-edit">
+            <input
+              type="text"
+              name="editRoomName"
+              [ngModel]="editName()"
+              (ngModelChange)="editName.set($event)"
+              (blur)="saveRoomName()"
+              (keyup.enter)="saveRoomName()"
+              placeholder="房间名称"
+            />
+          </div>
         </div>
+
+        <!-- Stats -->
         <div class="detail-grid">
           <div class="detail-card">
             <h3>角色阵容</h3>
-            <div class="chip-group">
-              @for (name of summary.characterNames; track name) {
-                <span class="chip">{{ name }}</span>
-              }
-            </div>
+            <p class="stat-value">{{ summary.characterCount }} 位</p>
           </div>
           <div class="detail-card">
             <h3>消息数量</h3>
-            <p>{{ summary.messageCount }} 条对话记录</p>
+            <p class="stat-value">{{ summary.messageCount }} 条</p>
           </div>
           <div class="detail-card">
             <h3>记忆数量</h3>
-            <p>{{ summary.memoryCount }} 条剧情记忆</p>
+            <p class="stat-value">{{ summary.memoryCount }} 条</p>
           </div>
         </div>
 
-        <div class="editor-grid">
-          <div class="detail-card">
-            <h3>编辑房间</h3>
-            <label for="roomName">房间名称</label>
-            <input
-              id="roomName"
-              type="text"
-              name="roomName"
-              [ngModel]="editName()"
-              (ngModelChange)="editName.set($event)"
-            />
-            <label>参与角色</label>
-            <div class="checkbox-group">
-              @for (character of characterStore.characters(); track character.id) {
-                <label class="checkbox-item">
-                  <input
-                    type="checkbox"
-                    [checked]="editCharacterIds().includes(character.id)"
-                    (change)="toggleEditCharacter(character.id)"
-                  />
-                  <span>{{ character.name }}</span>
-                </label>
-              }
+        <!-- ── Dynamic Character Management ─────────────────────── -->
+        <div class="character-management">
+          <!-- Assigned Characters -->
+          <div class="detail-card character-section">
+            <div class="section-header">
+              <h3>当前角色</h3>
+              <button type="button" class="add-btn" (click)="toggleNewCharacterForm()">
+                {{ showNewCharacterForm() ? '取消' : '+ 新建角色' }}
+              </button>
             </div>
-            <button
-              type="button"
-              class="primary"
-              [disabled]="!editName().trim()"
-              (click)="saveActiveRoom()"
-            >
-              保存房间
-            </button>
+
+            @if (activeRoomCharacters().length) {
+              <div class="character-card-list">
+                @for (c of activeRoomCharacters(); track c.id) {
+                  <div class="character-card">
+                    <div class="char-card-body">
+                      <div class="char-card-name">{{ c.name }}</div>
+                      <div class="char-card-meta">
+                        <span class="model-badge">{{ c.modelLabel }}</span>
+                        <span>{{ c.personality.slice(0, 30) }}</span>
+                      </div>
+                    </div>
+                    @if (!characterStore.isProtected(c.id)) {
+                      <button
+                        type="button"
+                        class="remove-char-btn"
+                        title="从房间移除"
+                        (click)="removeCharacterFromRoom(c.id)"
+                      >−</button>
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-hint">暂无角色，从下方添加。</p>
+            }
+
+            <!-- Inline Character Creation -->
+            @if (showNewCharacterForm()) {
+              <div class="inline-create-form">
+                <h4>新建角色并加入房间</h4>
+                <input
+                  type="text"
+                  name="newCharName"
+                  placeholder="角色名称"
+                  [ngModel]="newCharacter().name"
+                  (ngModelChange)="updateNewCharacter({ name: $event })"
+                />
+                <input
+                  type="text"
+                  name="newCharPersonality"
+                  placeholder="性格特点"
+                  [ngModel]="newCharacter().personality"
+                  (ngModelChange)="updateNewCharacter({ personality: $event })"
+                />
+                <input
+                  type="text"
+                  name="newCharBackground"
+                  placeholder="背景（可选）"
+                  [ngModel]="newCharacter().background"
+                  (ngModelChange)="updateNewCharacter({ background: $event })"
+                />
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="!newCharacter().name.trim()"
+                  (click)="createAndAddCharacter()"
+                >
+                  创建并加入
+                </button>
+              </div>
+            }
           </div>
 
-          <div class="detail-card">
-            <h3>新建房间</h3>
-            <label for="newRoomName">房间名称</label>
+          <!-- Available Characters -->
+          <div class="detail-card character-section">
+            <h3>可用角色</h3>
+            @if (availableCharacters().length) {
+              <div class="character-card-list">
+                @for (c of availableCharacters(); track c.id) {
+                  <div class="character-card available">
+                    <div class="char-card-body">
+                      <div class="char-card-name">{{ c.name }}</div>
+                      <div class="char-card-meta">
+                        <span class="model-badge">{{ c.model.provider }}/{{ c.model.model }}</span>
+                        <span>{{ c.personality.slice(0, 30) }}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="add-char-btn"
+                      title="加入房间"
+                      (click)="addCharacterToRoom(c.id)"
+                    >+</button>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-hint">所有角色已在当前房间中。</p>
+            }
+          </div>
+        </div>
+
+        <!-- ── Create New Room ─────────────────────────────────── -->
+        <div class="detail-card">
+          <h3>新建房间</h3>
+          <div class="new-room-row">
             <input
-              id="newRoomName"
               type="text"
               name="newRoomName"
-              placeholder="例如 侧舞台"
+              placeholder="房间名称"
               [ngModel]="newRoomName()"
               (ngModelChange)="newRoomName.set($event)"
             />
-            <label>参与角色</label>
-            <div class="checkbox-group">
-              @for (character of characterStore.characters(); track character.id) {
-                <label class="checkbox-item">
-                  <input
-                    type="checkbox"
-                    [checked]="newRoomCharacterIds().includes(character.id)"
-                    (change)="toggleNewCharacter(character.id)"
-                  />
-                  <span>{{ character.name }}</span>
-                </label>
-              }
-            </div>
             <button
               type="button"
               class="primary"
               [disabled]="!newRoomName().trim()"
               (click)="createRoom()"
             >
-              创建房间
+              创建
             </button>
           </div>
+          <p class="section-hint">创建后可在当前房间中动态调整角色阵容。</p>
         </div>
       }
     </section>

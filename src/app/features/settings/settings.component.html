@@ -71,57 +71,8 @@
     </section>
 
     <section class="card">
-      <h2>API 密钥配置</h2>
-      <p class="card-intro">为各 Provider 配置 API Key 和自定义端点地址。密钥仅存储在本地 localStorage 中。</p>
-
-      <button type="button" class="toggle-section-btn" (click)="showApiKeys.set(!showApiKeys())">
-        {{ showApiKeys() ? '收起 API 配置' : '展开 API 配置' }}
-      </button>
-
-      @if (showApiKeys()) {
-        <div class="api-keys-grid">
-          @for (provider of providers; track provider) {
-            <div class="api-key-card">
-              <h3>
-                {{ provider }}
-                @if (provider === 'gemini') {
-                  <span class="api-type-tag genai">GenAI</span>
-                } @else {
-                  <span class="api-type-tag openai-fmt">OpenAI 格式</span>
-                }
-              </h3>
-              <label [for]="'apiKey-' + provider">API Key</label>
-              <input
-                [id]="'apiKey-' + provider"
-                type="password"
-                name="'apiKey-' + provider"
-                placeholder="sk-..."
-                [ngModel]="getApiKey(provider)"
-                (ngModelChange)="updateApiKey(provider, $event)"
-              />
-              <label [for]="'baseUrl-' + provider">Base URL</label>
-              <input
-                [id]="'baseUrl-' + provider"
-                type="text"
-                name="'baseUrl-' + provider"
-                [placeholder]="getDefaultBaseUrl(provider)"
-                [ngModel]="getBaseUrl(provider)"
-                (ngModelChange)="updateBaseUrl(provider, $event)"
-              />
-              @if (getApiKey(provider)) {
-                <span class="key-status configured">✓ 已配置</span>
-              } @else {
-                <span class="key-status unconfigured">未配置</span>
-              }
-            </div>
-          }
-        </div>
-      }
-    </section>
-
-    <section class="card">
       <h2>模型管理</h2>
-      <p class="card-intro">添加自定义模型，供角色编辑器选用。</p>
+      <p class="card-intro">添加自定义模型，配置 API 端点和密钥。支持 OpenAI 格式和 Google GenAI 格式。</p>
 
       <div class="add-model-form">
         <div class="add-model-row">

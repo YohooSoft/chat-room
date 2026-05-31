@@ -282,31 +282,17 @@ export class LlmService {
    * Resolve the provider for a given name.
    *
    * Priority:
-   * 1. Provider-level API key from settings (providerApiKeys)
-   * 2. Model-specific API key from custom models list (customModels)
-   * 3. Mock provider (fallback)
+   * 1. Model-specific API key from custom models list
+   * 2. Mock provider (fallback)
    */
   private resolveProvider(providerName: string, modelName?: string): LlmProvider {
     const state = this.storageService.state();
     const preferences = state.user.preferences as Record<string, unknown>;
-    const apiKeys = preferences?.['providerApiKeys'] as
-      | Record<string, { apiKey: string; baseUrl: string }>
-      | undefined;
     const customModels = preferences?.['customModels'] as
       | Array<{ provider: string; model: string; apiKey?: string; baseUrl?: string; isGenAI?: boolean }>
       | undefined;
 
-    // 1. Check provider-level API key
-    const providerConfig = apiKeys?.[providerName];
-    if (providerConfig?.apiKey) {
-      const baseUrl = providerConfig.baseUrl || DEFAULT_BASE_URLS[providerName] || '';
-      if (baseUrl) {
-        console.info(`[LlmService] 使用 Provider API: ${providerName} @ ${baseUrl}`);
-        return this.createRealProvider(providerName, baseUrl, providerConfig.apiKey);
-      }
-    }
-
-    // 2. Check model-specific API key from custom models
+    // Check model-specific API key from custom models
     if (modelName && customModels?.length) {
       const modelConfig = customModels.find(
         (m) => m.provider === providerName && m.model === modelName && m.apiKey
@@ -323,7 +309,7 @@ export class LlmService {
       }
     }
 
-    // 3. Fallback to mock
+    // Fallback to mock
     const mock = this.mockProviders.get(providerName);
     if (mock) return mock;
 
