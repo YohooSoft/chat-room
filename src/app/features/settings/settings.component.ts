@@ -10,6 +10,8 @@ interface UserPreferences extends Record<string, unknown> {
   defaultTemperature?: number;
 }
 
+const SAVE_MESSAGE_PREFIX = '已保存';
+
 @Component({
   selector: 'app-settings',
   standalone: true,
@@ -75,12 +77,16 @@ export class SettingsComponent {
     };
     this.storageService.write(nextState);
     this.storageState.set(nextState);
-    this.savedMessage.set(`已保存 ${new Date().toLocaleTimeString('zh-CN')}`);
+    this.savedMessage.set(`${SAVE_MESSAGE_PREFIX} ${new Date().toLocaleTimeString('zh-CN')}`);
   }
 
   updateTemperature(value: string): void {
     const numeric = Number(value);
-    this.temperature.set(Number.isNaN(numeric) ? this.temperature() : numeric);
+    if (Number.isNaN(numeric)) {
+      return;
+    }
+    const clamped = Math.min(1, Math.max(0, numeric));
+    this.temperature.set(clamped);
   }
 
   private load(): void {
