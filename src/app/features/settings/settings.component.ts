@@ -91,7 +91,6 @@ export class SettingsComponent {
 
   private load(): void {
     const state = this.storageService.read();
-    this.storageState.set(state);
     const preferences = state.user.preferences as UserPreferences;
     this.name.set(state.user.name ?? '');
     this.provider.set(preferences.defaultProvider ?? DEFAULT_PROVIDER);
