@@ -21,7 +21,7 @@ export class MemoryComponent {
 
   readonly scope = signal<'room' | 'character'>('room');
   readonly selectedRoomId = signal<string>(this.roomStore.activeRoomId());
-  readonly selectedCharacterId = signal<string>(this.characters()[0]?.id ?? '');
+  readonly selectedCharacterId = signal<string>('');
 
   readonly currentMemories = computed(() => {
     const scope = this.scope();

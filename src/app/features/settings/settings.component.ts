@@ -4,6 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { StorageService } from '../../core/storage/storage.service';
 import { AppStorageState } from '../../shared/types/chat.types';
 
+interface UserPreferences extends Record<string, unknown> {
+  defaultProvider?: string;
+  defaultModel?: string;
+  defaultTemperature?: number;
+}
+
 @Component({
   selector: 'app-settings',
   standalone: true,
@@ -53,8 +59,8 @@ export class SettingsComponent {
 
   save(): void {
     const state = this.storageService.read();
-    const preferences = {
-      ...state.user.preferences,
+    const preferences: UserPreferences = {
+      ...(state.user.preferences as UserPreferences),
       defaultProvider: this.provider(),
       defaultModel: this.model(),
       defaultTemperature: this.temperature()
@@ -80,14 +86,12 @@ export class SettingsComponent {
   private load(): void {
     const state = this.storageService.read();
     this.storageState.set(state);
-    const preferences = state.user.preferences as Record<string, unknown>;
+    const preferences = state.user.preferences as UserPreferences;
     this.name.set(state.user.name ?? '');
-    this.provider.set((preferences?.['defaultProvider'] as string) ?? 'openai');
-    this.model.set((preferences?.['defaultModel'] as string) ?? 'gpt-4o-mini');
+    this.provider.set(preferences.defaultProvider ?? 'openai');
+    this.model.set(preferences.defaultModel ?? 'gpt-4o-mini');
     this.temperature.set(
-      typeof preferences?.['defaultTemperature'] === 'number'
-        ? (preferences['defaultTemperature'] as number)
-        : 0.7
+      typeof preferences.defaultTemperature === 'number' ? preferences.defaultTemperature : 0.7
     );
   }
 }
