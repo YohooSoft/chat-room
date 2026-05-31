@@ -166,7 +166,8 @@ export class WebDavSyncService {
         ...remote.user,
         profile: { ...local.user.profile, ...(remote.user?.profile ?? {}) },
         preferences: { ...local.user.preferences, ...(remote.user?.preferences ?? {}) }
-      }
+      },
+      userAffinity: { ...local.userAffinity, ...(remote.userAffinity ?? {}) }
     };
     return merged;
   }

@@ -4,6 +4,7 @@ import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { UiStore } from '../../store/ui.store';
 import { LlmService } from '../llm/llm.service';
+import { UserAffinityService } from '../haiku/user-affinity.service';
 import { Role } from '../../shared/types/chat.types';
 
 const MAX_SPEAKERS_PER_ROUND = 5;
@@ -15,7 +16,8 @@ export class DiscussionEngineService {
     private readonly characterStore: CharacterStore,
     private readonly llmService: LlmService,
     private readonly chatStore: ChatStore,
-    private readonly uiStore: UiStore
+    private readonly uiStore: UiStore,
+    private readonly affinityService: UserAffinityService
   ) {}
 
   /**
@@ -66,6 +68,17 @@ export class DiscussionEngineService {
     this.uiStore.pauseDiscussion(roomId, speakers);
   }
 
+  /**
+   * Generate tone guidance based on user↔character affinity score.
+   * Injected into system prompt so the model adapts its warmth.
+   */
+  private affinityGuidance(score: number, name: string): string {
+    if (score >= 0.8) return `你与用户非常亲密（亲密度 ${Math.round(score * 100)}%），像老朋友一样——语气可以随意、温暖、有默契。`;
+    if (score >= 0.5) return `你与用户比较熟悉（亲密度 ${Math.round(score * 100)}%），友好但保持适度的分寸。`;
+    if (score >= 0.3) return `你与用户刚认识不久（亲密度 ${Math.round(score * 100)}%），礼貌、友善，保持适当距离。`;
+    return `你与用户初次交流（亲密度 ${Math.round(score * 100)}%），像第一次见面一样自然问候。`;
+  }
+
   private async runRound(
     speakers: string[],
     otherNames: string[],
@@ -84,16 +97,18 @@ export class DiscussionEngineService {
       let systemMsg: string;
       if (round === 0) {
         // Reply to user — like a group chat where people see each other's messages
+        const affinityScore = this.affinityService.getAffinity(speakerId);
+        const affinityHint = this.affinityGuidance(affinityScore, character.name);
         const positionIndex = speakers.indexOf(speakerId);
         if (positionIndex === 0) {
-          systemMsg = `你是 ${character.name}。你正在一个群聊中，用户刚刚说：「${userContent || '请回应'}」。你是第一个看到这条消息的人，请用你的风格自然回应。${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。你正在一个群聊中，用户刚刚说：「${userContent || '请回应'}」。你是第一个看到这条消息的人，请用你的风格自然回应。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         } else {
           const prevName = speakers
             .slice(0, positionIndex)
             .map((id) => this.characterStore.getCharacter(id)?.name)
             .filter(Boolean)
             .join('、');
-          systemMsg = `你是 ${character.name}。用户说：「${userContent || '请回应'}」。在你之前，${prevName} 已经回复了（见上方）。你现在才看到消息——请像真人聊天一样：可以附和、反驳、补充新角度、或者另起话题。不要复读前面的人。${character.personality ? `你的性格：${character.personality}` : ''}`;
+          systemMsg = `你是 ${character.name}。用户说：「${userContent || '请回应'}」。在你之前，${prevName} 已经回复了（见上方）。你现在才看到消息——请像真人聊天一样：可以附和、反驳、补充新角度、或者另起话题。不要复读前面的人。${affinityHint}${character.personality ? `你的性格：${character.personality}` : ''}`;
         }
       } else {
         // AI-to-AI — natural group chat

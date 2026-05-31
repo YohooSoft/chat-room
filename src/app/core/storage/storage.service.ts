@@ -16,7 +16,8 @@ const DEFAULT_STATE: AppStorageState = {
     name: '',
     profile: {},
     preferences: {}
-  }
+  },
+  userAffinity: {}
 };
 
 const mergeState = (state: Partial<AppStorageState>): AppStorageState => ({
@@ -34,7 +35,8 @@ const mergeState = (state: Partial<AppStorageState>): AppStorageState => ({
     ...state.user,
     profile: { ...DEFAULT_STATE.user.profile, ...(state.user?.profile ?? {}) },
     preferences: { ...DEFAULT_STATE.user.preferences, ...(state.user?.preferences ?? {}) }
-  }
+  },
+  userAffinity: { ...DEFAULT_STATE.userAffinity, ...(state.userAffinity ?? {}) }
 });
 
 @Injectable({ providedIn: 'root' })

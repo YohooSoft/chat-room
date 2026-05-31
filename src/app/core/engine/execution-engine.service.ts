@@ -1,10 +1,12 @@
 import { Injectable } from '@angular/core';
 
+import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { UiStore } from '../../store/ui.store';
 import { ExecutionPlan } from '../../shared/types/chat.types';
 import { DiscussionEngineService } from '../discussion/discussion-engine.service';
 import { RelationEvolutionService } from '../discussion/relation-evolution.service';
+import { UserAffinityService } from '../haiku/user-affinity.service';
 import { LlmService } from '../llm/llm.service';
 import { MemoryService } from '../memory/memory.service';
 
@@ -15,6 +17,8 @@ export class ExecutionEngineService {
     private readonly memoryService: MemoryService,
     private readonly discussionEngine: DiscussionEngineService,
     private readonly relationEvolution: RelationEvolutionService,
+    private readonly userAffinity: UserAffinityService,
+    private readonly characterStore: CharacterStore,
     private readonly uiStore: UiStore,
     private readonly chatStore: ChatStore
   ) {}
@@ -70,6 +74,17 @@ export class ExecutionEngineService {
     if (participants.size >= 2) {
       const recentMessages = this.chatStore.messagesForRoom(plan.roomId).slice(-10);
       this.relationEvolution.evolve(recentMessages, [...participants]);
+    }
+
+    // ── Evaluate user↔character affinity (Haiku judges) ────────────
+    if (participants.size >= 1) {
+      const recentMessages = this.chatStore.messagesForRoom(plan.roomId).slice(-10);
+      const nameMap = new Map<string, string>();
+      for (const id of participants) {
+        const c = this.characterStore.getCharacter(id);
+        if (c) nameMap.set(id, c.name);
+      }
+      this.userAffinity.evaluate([...participants], recentMessages, nameMap);
     }
   }
 }

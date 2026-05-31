@@ -111,6 +111,8 @@ export interface AppStorageState {
     profile: Record<string, unknown>;
     preferences: Record<string, unknown>;
   };
+  /** User→Character affinity scores (0~1), judged by Haiku. */
+  userAffinity: Record<string, number>;
 }
 
 export type AppEvent =

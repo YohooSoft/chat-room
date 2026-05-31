@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Character } from '../../shared/types/chat.types';
 import { CharacterStore } from '../../store/character.store';
 import { StorageService } from '../../core/storage/storage.service';
+import { UserAffinityService } from '../../core/haiku/user-affinity.service';
 
 interface CharacterForm {
   name: string;
@@ -61,6 +62,7 @@ const DEFAULT_RELATION_EDITOR: RelationEditor = {
 export class CharacterComponent {
   readonly characterStore = inject(CharacterStore);
   private readonly storageService = inject(StorageService);
+  private readonly affinityService = inject(UserAffinityService);
   readonly characters = this.characterStore.characters;
   readonly selectedId = signal<string>('');
   readonly draft = signal<CharacterForm>(DEFAULT_FORM);
@@ -273,6 +275,18 @@ export class CharacterComponent {
       return;
     }
     this.updateDraft({ temperature: Math.min(1, Math.max(0, numeric)) });
+  }
+
+  affinityLabel(characterId: string): string {
+    const score = this.affinityService.getAffinity(characterId);
+    if (score >= 0.8) return '❤️ 亲密';
+    if (score >= 0.5) return '😊 友好';
+    if (score >= 0.3) return '👋 认识';
+    return '🆕 初识';
+  }
+
+  affinityPercent(characterId: string): number {
+    return Math.round(this.affinityService.getAffinity(characterId) * 100);
   }
 
   trackById(_index: number, character: Character): string {
