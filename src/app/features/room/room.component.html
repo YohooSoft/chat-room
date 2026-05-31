@@ -1,0 +1,54 @@
+<section class="room-shell">
+  <header class="page-header">
+    <h1>房间管理</h1>
+    <p>切换不同剧情舞台，查看角色与记忆概况。</p>
+  </header>
+
+  <div class="room-layout">
+    <aside class="room-list">
+      @for (room of roomSummaries(); track trackById($index, room)) {
+        <button
+          type="button"
+          class="room-item"
+          [class.active]="room.id === roomStore.activeRoomId()"
+          (click)="setActiveRoom(room.id)"
+        >
+          <div class="room-title">{{ room.name }}</div>
+          <div class="room-meta">
+            <span>角色 {{ room.characterCount }}</span>
+            <span>消息 {{ room.messageCount }}</span>
+            <span>记忆 {{ room.memoryCount }}</span>
+          </div>
+          <div class="room-characters">{{ room.characterNames.join(' / ') }}</div>
+        </button>
+      }
+    </aside>
+
+    <section class="room-detail">
+      @if (activeSummary(); as summary) {
+        <div class="detail-header">
+          <h2>{{ summary.name }}</h2>
+          <span class="tag">当前房间</span>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h3>角色阵容</h3>
+            <div class="chip-group">
+              @for (name of summary.characterNames; track name) {
+                <span class="chip">{{ name }}</span>
+              }
+            </div>
+          </div>
+          <div class="detail-card">
+            <h3>消息数量</h3>
+            <p>{{ summary.messageCount }} 条对话记录</p>
+          </div>
+          <div class="detail-card">
+            <h3>记忆数量</h3>
+            <p>{{ summary.memoryCount }} 条剧情记忆</p>
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</section>

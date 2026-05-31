@@ -28,6 +28,11 @@ export class MemoryService {
     return state.memories.room[roomId] ?? [];
   }
 
+  getCharacterMemories(characterId: string): MemoryRecord[] {
+    const state = this.storageService.read();
+    return state.memories.character[characterId] ?? [];
+  }
+
   private appendMemory(state: AppStorageState, memory: MemoryRecord): void {
     const key = memory.targetId ?? 'global';
     const group = state.memories[memory.scope];

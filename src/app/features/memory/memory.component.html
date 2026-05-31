@@ -1,0 +1,77 @@
+<section class="memory-shell">
+  <header class="page-header">
+    <h1>记忆查看器</h1>
+    <p>浏览房间与角色的剧情记忆记录。</p>
+  </header>
+
+  <div class="memory-controls">
+    <button
+      type="button"
+      [class.active]="scope() === 'room'"
+      (click)="setScope('room')"
+    >
+      房间记忆
+    </button>
+    <button
+      type="button"
+      [class.active]="scope() === 'character'"
+      (click)="setScope('character')"
+    >
+      角色记忆
+    </button>
+  </div>
+
+  <div class="memory-layout">
+    <aside class="target-list">
+      <h3>选择目标</h3>
+      @if (scope() === 'room') {
+        @for (room of rooms(); track room.id) {
+          <button
+            type="button"
+            class="target-item"
+            [class.active]="room.id === selectedRoomId()"
+            (click)="selectRoom(room.id)"
+          >
+            {{ room.name }}
+          </button>
+        }
+      } @else {
+        @for (character of characters(); track character.id) {
+          <button
+            type="button"
+            class="target-item"
+            [class.active]="character.id === selectedCharacterId()"
+            (click)="selectCharacter(character.id)"
+          >
+            {{ character.name }}
+          </button>
+        }
+      }
+    </aside>
+
+    <section class="memory-detail">
+      <div class="detail-header">
+        <div>
+          <h2>{{ currentTargetName() }}</h2>
+          <p>共 {{ currentMemories().length }} 条记忆</p>
+        </div>
+      </div>
+
+      @if (currentMemories().length) {
+        <div class="memory-list">
+          @for (memory of currentMemories(); track trackById($index, memory)) {
+            <article class="memory-card">
+              <div class="memory-meta">
+                <span>重要度 {{ memory.importance }}</span>
+                <span>{{ formatDate(memory.createdAt) }}</span>
+              </div>
+              <p>{{ memory.content }}</p>
+            </article>
+          }
+        </div>
+      } @else {
+        <div class="empty-state">暂无记忆记录。</div>
+      }
+    </section>
+  </div>
+</section>

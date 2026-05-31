@@ -1,0 +1,78 @@
+<section class="character-shell">
+  <header class="page-header">
+    <h1>角色编辑器</h1>
+    <p>查看并管理 AI 角色设定与模型信息。</p>
+  </header>
+
+  <div class="character-layout">
+    <aside class="character-list">
+      @for (character of characters(); track trackById($index, character)) {
+        <button
+          type="button"
+          class="character-item"
+          [class.active]="character.id === selectedId()"
+          (click)="selectCharacter(character.id)"
+        >
+          <div class="character-name">{{ character.name }}</div>
+          <div class="character-meta">{{ character.background }}</div>
+        </button>
+      }
+    </aside>
+
+    <section class="character-detail">
+      @if (selectedCharacter(); as character) {
+        <div class="detail-header">
+          <div>
+            <h2>{{ character.name }}</h2>
+            <p>{{ character.personality }}</p>
+          </div>
+          <span class="badge" [class.advanced]="character.promptMode === 'advanced'">
+            {{ character.promptMode === 'auto' ? '自动提示' : '高级提示' }}
+          </span>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h3>角色背景</h3>
+            <p>{{ character.background }}</p>
+          </div>
+
+          <div class="detail-card">
+            <h3>模型配置</h3>
+            <ul>
+              <li>Provider：{{ character.model.provider }}</li>
+              <li>Model：{{ character.model.model }}</li>
+              <li>Temperature：{{ character.model.temperature }}</li>
+            </ul>
+          </div>
+
+          <div class="detail-card">
+            <h3>系统提示词</h3>
+            <p>
+              @if (character.systemPrompt) {
+                {{ character.systemPrompt }}
+              } @else {
+                当前使用自动提示模板。
+              }
+            </p>
+          </div>
+
+          <div class="detail-card">
+            <h3>关系概览</h3>
+            @if (relationEntries(character).length) {
+              <ul>
+                @for (relation of relationEntries(character); track relation.id) {
+                  <li>
+                    {{ relation.id }}：亲密度 {{ relation.closeness }}，信任度 {{ relation.trust }}
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p>暂无角色关系数据。</p>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  </div>
+</section>
