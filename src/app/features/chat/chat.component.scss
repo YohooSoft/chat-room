@@ -10,6 +10,31 @@
   gap: 1rem;
 }
 
+.mock-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  font-size: 0.9rem;
+  color: #e65100;
+  flex-wrap: wrap;
+}
+
+.mock-banner a {
+  color: #1565c0;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.mock-banner a:hover {
+  text-decoration: underline;
+}
+
 .chat-header {
   display: flex;
   justify-content: space-between;

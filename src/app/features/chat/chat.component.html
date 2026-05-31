@@ -20,6 +20,13 @@
     </div>
   </header>
 
+  @if (usingMockMode()) {
+    <div class="mock-banner">
+      <span>⚠️ 未配置 API Key，当前为<strong>模拟模式</strong>。</span>
+      <a routerLink="/settings">前往设置 → 模型管理</a>
+    </div>
+  }
+
   @if (showCreateRoom()) {
     <div class="create-room-inline">
       <h3>创建新房间</h3>

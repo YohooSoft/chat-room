@@ -1,8 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import { EventBusService } from '../../core/event-bus/event-bus.service';
 import { ChatOrchestratorService } from '../../core/engine/chat-orchestrator.service';
+import { LlmService } from '../../core/llm/llm.service';
 import { ChatStore } from '../../store/chat.store';
 import { CharacterStore } from '../../store/character.store';
 import { RoomStore } from '../../store/room.store';
@@ -11,7 +13,7 @@ import { UiStore } from '../../store/ui.store';
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss'
 })
@@ -20,6 +22,7 @@ export class ChatComponent {
   readonly chatStore = inject(ChatStore);
   readonly uiStore = inject(UiStore);
   readonly characterStore = inject(CharacterStore);
+  private readonly llmService = inject(LlmService);
 
   private readonly eventBus = inject(EventBusService);
   private readonly orchestrator = inject(ChatOrchestratorService);
@@ -29,6 +32,7 @@ export class ChatComponent {
   readonly showCreateRoom = signal(false);
   readonly newRoomName = signal('');
   readonly newRoomCharacterIds = signal<string[]>([]);
+  readonly usingMockMode = computed(() => !this.llmService.hasAnyApiKey());
   readonly currentMessages = computed(() =>
     this.chatStore.messagesForRoom(this.roomStore.activeRoomId())
   );

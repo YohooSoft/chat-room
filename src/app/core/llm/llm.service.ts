@@ -17,21 +17,14 @@ class MockProvider implements LlmProvider {
   async chat(request: ChatRequest): Promise<ChatResponse> {
     const latest = request.messages.at(-1)?.content ?? '';
     return {
-      content: `[${this.providerName}/${request.model}] ${latest.slice(0, 160)}`
+      content: `[MOCK ${this.providerName}/${request.model}] 未配置 API Key，这是模拟回复。请在 设置→模型管理 中添加模型和 API Key。\n\n你的输入：${latest.slice(0, 200)}`
     };
   }
 
   async *chatStream(request: ChatRequest): AsyncGenerator<string, ChatResponse> {
-    const latest = request.messages.at(-1)?.content ?? '';
-    const full = `[${this.providerName}/${request.model}] ${latest.slice(0, 160)}`;
-
-    const words = full.split(/(\s+)/);
-    for (const word of words) {
-      yield word;
-      await new Promise((resolve) => setTimeout(resolve, 40 + Math.random() * 40));
-    }
-
-    return { content: full };
+    const response = await this.chat(request);
+    yield response.content;
+    return response;
   }
 }
 
@@ -323,6 +316,16 @@ export class LlmService {
       return new GeminiProvider(baseUrl, apiKey);
     }
     return new OpenAiCompatibleProvider(baseUrl, apiKey);
+  }
+
+  /** Check if any custom model has an API key configured. */
+  hasAnyApiKey(): boolean {
+    const state = this.storageService.state();
+    const preferences = state.user.preferences as Record<string, unknown>;
+    const customModels = preferences?.['customModels'] as
+      | Array<{ apiKey?: string }>
+      | undefined;
+    return customModels?.some((m) => !!m.apiKey) ?? false;
   }
 
   async chat(providerName: string, request: ChatRequest): Promise<ChatResponse> {
