@@ -162,22 +162,16 @@ export class HaikuService {
       const discussionRound = this.computeDiscussionRound(roomMessages);
       const speakerIds = charactersToSpeak.map((c) => c.id);
 
-      // Guide AI-to-AI exchange: build context that encourages inter-AI dialogue
       console.info(
-        `[Haiku] 触发 AI 对话：${charactersToSpeak.map((c) => c.name).join(' ↔ ')} (第 ${discussionRound} 轮)`
+        `[Haiku] 触发 AI 对话队列：${charactersToSpeak.map((c) => c.name).join(' → ')} (第 ${discussionRound} 轮)`
       );
 
+      // Discussion engine handles all speakers sequentially in a queue
       actions.push({
         type: 'trigger_discussion',
         round: discussionRound,
         speakers: speakerIds
       });
-
-      // After discussion, let the most relevant character respond to user
-      const topCharacter = charactersToSpeak[0];
-      if (topCharacter && actions.length < MAX_ACTIONS_PER_PLAN) {
-        actions.push(this.buildModelCall(topCharacter, context, userContent));
-      }
     } else {
       for (const character of charactersToSpeak) {
         if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
