@@ -16,6 +16,9 @@ export class CharacterComponent {
   readonly selectedCharacter = computed(() => {
     const characters = this.characters();
     const currentId = this.selectedId();
+    if (!characters.length) {
+      return undefined;
+    }
     return characters.find((character) => character.id === currentId) ?? characters[0];
   });
 

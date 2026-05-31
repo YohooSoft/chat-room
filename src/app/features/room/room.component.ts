@@ -43,6 +43,9 @@ export class RoomComponent {
   readonly activeRoom = this.roomStore.activeRoom;
   readonly activeSummary = computed(() => {
     const summaries = this.roomSummaries();
+    if (!summaries.length) {
+      return undefined;
+    }
     const activeId = this.roomStore.activeRoomId();
     return summaries.find((summary) => summary.id === activeId) ?? summaries[0];
   });

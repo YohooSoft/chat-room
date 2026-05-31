@@ -5,6 +5,9 @@ import { MemoryRecord } from '../../shared/types/chat.types';
 import { CharacterStore } from '../../store/character.store';
 import { RoomStore } from '../../store/room.store';
 
+const NO_ROOM_SELECTED_LABEL = '未选择房间';
+const NO_CHARACTER_SELECTED_LABEL = '未选择角色';
+
 @Component({
   selector: 'app-memory',
   standalone: true,
@@ -35,12 +38,13 @@ export class MemoryComponent {
   readonly currentTargetName = computed(() => {
     if (this.scope() === 'room') {
       return (
-        this.rooms().find((room) => room.id === this.selectedRoomId())?.name ?? '未选择房间'
+        this.rooms().find((room) => room.id === this.selectedRoomId())?.name ??
+        NO_ROOM_SELECTED_LABEL
       );
     }
     return (
       this.characters().find((character) => character.id === this.selectedCharacterId())?.name ??
-      '未选择角色'
+      NO_CHARACTER_SELECTED_LABEL
     );
   });
 
