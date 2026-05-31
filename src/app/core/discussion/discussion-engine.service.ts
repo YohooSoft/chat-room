@@ -130,7 +130,8 @@ export class DiscussionEngineService {
         } else {
           this.chatStore.finalizeStreamedMessage(messageId);
         }
-      } catch {
+      } catch (err) {
+        this.chatStore.appendStreamChunk(messageId, `[错误] ${err instanceof Error ? err.message : '请求失败'}`);
         this.chatStore.finalizeStreamedMessage(messageId);
       }
 

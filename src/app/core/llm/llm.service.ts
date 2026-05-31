@@ -8,7 +8,7 @@ const DEFAULT_BASE_URLS: Record<string, string> = {
   openai: 'https://api.openai.com/v1',
   claude: 'https://api.anthropic.com/v1',
   gemini: 'https://generativelanguage.googleapis.com/v1beta',
-  'openai-compatible': ''
+  'openai-compatible': 'https://api.deepseek.com/v1'
 };
 
 class MockProvider implements LlmProvider {
@@ -292,13 +292,14 @@ export class LlmService {
       );
       if (modelConfig?.apiKey) {
         const baseUrl = modelConfig.baseUrl || DEFAULT_BASE_URLS[providerName] || '';
-        if (baseUrl) {
+        if (baseUrl && baseUrl.startsWith('http')) {
           console.info(`[LlmService] 使用 Model API: ${providerName}/${modelName} @ ${baseUrl}`);
           if (modelConfig.isGenAI) {
             return new GeminiProvider(baseUrl, modelConfig.apiKey);
           }
           return new OpenAiCompatibleProvider(baseUrl, modelConfig.apiKey);
         }
+        console.warn(`[LlmService] ${providerName}/${modelName} Base URL 无效（${baseUrl || '(空)'}），请到设置中填写正确的 API 地址`);
       }
     }
 

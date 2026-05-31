@@ -47,7 +47,9 @@ export class ExecutionEngineService {
             }
 
             this.chatStore.finalizeStreamedMessage(messageId);
-          } catch {
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : '请求失败';
+            this.chatStore.appendStreamChunk(messageId, `[错误] ${errorMsg}`);
             this.chatStore.finalizeStreamedMessage(messageId);
           }
           break;
