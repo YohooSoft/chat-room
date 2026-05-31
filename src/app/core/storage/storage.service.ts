@@ -56,14 +56,14 @@ export class StorageService {
   private readFromStorage(): AppStorageState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return structuredClone(DEFAULT_STATE);
+      return mergeState({});
     }
 
     try {
       const parsed = JSON.parse(raw) as Partial<AppStorageState>;
       return mergeState(parsed);
     } catch {
-      return structuredClone(DEFAULT_STATE);
+      return mergeState({});
     }
   }
 }
