@@ -117,13 +117,23 @@ export class HaikuService {
     const scored = eligible
       .map((c) => ({ character: c, score: this.scoreRelevance(c, userContent) }))
       .sort((a, b) => b.score - a.score);
-    // 3. Keep characters above threshold, but always at least MIN_RELEVANT_CHARACTERS
+    // 3. Keep characters above threshold
     const relevant = scored.filter((s) => s.score >= RELEVANCE_THRESHOLD);
-    const charactersToSpeak = (
-      relevant.length >= MIN_RELEVANT_CHARACTERS
-        ? relevant
-        : scored.slice(0, MIN_RELEVANT_CHARACTERS)
-    )
+    let selected: typeof scored;
+
+    if (relevant.length >= MIN_RELEVANT_CHARACTERS) {
+      // Enough passed the threshold — use all of them
+      selected = relevant;
+    } else if (scored.length <= 1) {
+      // Single character — always let them speak
+      selected = scored;
+    } else {
+      // No one passed threshold but multiple eligible — include all who tie with top score
+      const topScore = scored[0]?.score ?? 0;
+      selected = scored.filter((s) => s.score === topScore);
+    }
+
+    const charactersToSpeak = selected
       .slice(0, MAX_CHARACTERS_PER_TURN)
       .map((s) => s.character);
 
