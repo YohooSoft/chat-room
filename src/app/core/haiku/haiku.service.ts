@@ -32,8 +32,6 @@ const MEMORY_SIGNIFICANT_KEYWORDS = [
 // Character engagement: how many consecutive turns a character can participate
 // before needing a cooldown. Tracked per character per room via message history.
 const CHARACTER_COOLDOWN_TURNS = 1;
-const RELEVANCE_THRESHOLD = 0.15; // Minimum relevance score to speak (0~1)
-const MIN_RELEVANT_CHARACTERS = 1; // Always let at least 1 character speak
 
 @Injectable({ providedIn: 'root' })
 export class HaikuService {
@@ -110,52 +108,19 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Relevant Characters (visible only) ───────
-    // 1. Remove characters in cooldown
-    const eligible = this.selectEligibleCharacters(visibleCharacters, roomMessages);
-    // 2. Score relevance to user's message, filter irrelevant ones
-    const scored = eligible
-      .map((c) => ({ character: c, score: this.scoreRelevance(c, userContent) }))
-      .sort((a, b) => b.score - a.score);
-    // 3. Keep characters above threshold
-    const relevant = scored.filter((s) => s.score >= RELEVANCE_THRESHOLD);
-    let selected: typeof scored;
+    // ── Phase 2: Select Characters (visible only, no cooldown) ──
+    // All room characters speak — each AI model judges its own relevance
+    const charactersToSpeak = this.selectEligibleCharacters(visibleCharacters, roomMessages)
+      .slice(0, MAX_CHARACTERS_PER_TURN);
 
-    if (relevant.length >= MIN_RELEVANT_CHARACTERS) {
-      // Enough passed the threshold — use all of them
-      selected = relevant;
-    } else if (scored.length <= 1) {
-      // Single character — always let them speak
-      selected = scored;
-    } else {
-      // No one passed threshold but multiple eligible — include all who tie with top score
-      const topScore = scored[0]?.score ?? 0;
-      selected = scored.filter((s) => s.score === topScore);
-    }
+    console.info(
+      `[Haiku] 发言角色: ${charactersToSpeak.map((c) => c.name).join(', ') || '(无)'} — 由AI自行判断相关性`
+    );
 
-    const charactersToSpeak = selected
-      .slice(0, MAX_CHARACTERS_PER_TURN)
-      .map((s) => s.character);
-
-    // Log relevance scores with threshold and decision
-    if (scored.length) {
-      const passed = scored.filter((s) => s.score >= RELEVANCE_THRESHOLD);
-      console.info(
-        `[Haiku] 角色相关性 (阈值≥${RELEVANCE_THRESHOLD}):`,
-        scored.map((s) => `${s.character.name}:${s.score.toFixed(2)}${s.score >= RELEVANCE_THRESHOLD ? ' ✓' : ' ✗'}`).join(', '),
-        `→ 回复: ${charactersToSpeak.map((c) => c.name).join(', ') || '(无)'}`
-      );
-    }
-
-    // ── Phase 3: Decide Discussion ──────────────────────────────
-    // Trigger AI-to-AI discussion when:
-    // 1. Multiple characters are relevant (>=2), OR
-    // 2. User explicitly asks for discussion (keywords)
+    // ── Phase 3: Decide Discussion (2+ characters → AI dialogue) ─
     const shouldTriggerDiscussion =
-      (charactersToSpeak.length >= 2 &&
-        (this.shouldTriggerDiscussion(roomMessages, userContent) ||
-          charactersToSpeak.length >= 2)) &&
-      charactersToSpeak.length >= 2;
+      charactersToSpeak.length >= 2 &&
+      this.shouldTriggerDiscussion(roomMessages, userContent);
 
     // ── Phase 4: Model Calls ────────────────────────────────────
     // ── Phase 4: Round 1 — each character replies to the USER ──
@@ -283,32 +248,6 @@ export class HaikuService {
     return Math.min(MAX_DISCUSSION_ROUNDS, Math.max(1, Math.ceil(aiCount / 3)));
   }
 
-  // ── Relevance Scoring ────────────────────────────────────────────
-
-  /**
-   * Score how relevant a character is to the user's message.
-   *
-   * Checks keyword overlap between the user message and the character's
-   * name, personality, and background fields. Returns 0.0 ~ 1.0.
-   */
-  private scoreRelevance(character: Character, userContent: string): number {
-    const profileText = [character.name, character.personality, character.background]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    const messageText = userContent.toLowerCase();
-
-    const profileWords = this.tokenize(profileText);
-    const messageWords = this.tokenize(messageText);
-
-    if (!profileWords.size || !messageWords.size) return 0.5; // neutral
-
-    const intersection = new Set([...messageWords].filter((w) => profileWords.has(w)));
-    const score = intersection.size / Math.max(1, messageWords.size);
-
-    return Math.round(score * 100) / 100;
-  }
-
   // ── Memory Logic ─────────────────────────────────────────────────
 
   /**
@@ -424,53 +363,6 @@ export class HaikuService {
     );
 
     return parts.join(' ');
-  }
-
-  // ── Repetition Detection (public for DiscussionEngine use) ───────
-
-  /**
-   * Simple Jaccard word-level similarity check.
-   * Returns a score between 0 (completely different) and 1 (identical).
-   */
-  jaccardSimilarity(a: string, b: string): number {
-    const wordsA = this.tokenize(a);
-    const wordsB = this.tokenize(b);
-    if (!wordsA.size || !wordsB.size) return 0;
-
-    const intersection = new Set([...wordsA].filter((w) => wordsB.has(w)));
-    const union = new Set([...wordsA, ...wordsB]);
-    return intersection.size / union.size;
-  }
-
-  private tokenize(text: string): Set<string> {
-    const tokens = new Set<string>();
-
-    // CJK characters: use overlapping bigrams for Chinese text
-    const cjkPattern = /[一-鿿㐀-䶿]+/g;
-    let match: RegExpExecArray | null;
-    while ((match = cjkPattern.exec(text)) !== null) {
-      const segment = match[0];
-      // Add the full segment if short
-      if (segment.length <= 4) {
-        tokens.add(segment);
-      }
-      // Add overlapping bigrams
-      for (let i = 0; i < segment.length - 1; i++) {
-        tokens.add(segment.slice(i, i + 2));
-      }
-      // Also add individual meaningful chars
-      for (const ch of segment) {
-        tokens.add(ch);
-      }
-    }
-
-    // Non-CJK: split on whitespace/punctuation
-    const nonCjkParts = text.replace(cjkPattern, ' ').toLowerCase();
-    for (const w of nonCjkParts.split(/[\s，。！？、,.!?;:]+/)) {
-      if (w.length >= 2) tokens.add(w);
-    }
-
-    return tokens;
   }
 
   // ── Debug Logging ────────────────────────────────────────────────

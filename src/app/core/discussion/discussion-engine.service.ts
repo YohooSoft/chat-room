@@ -7,7 +7,6 @@ import { Role } from '../../shared/types/chat.types';
 
 const MAX_SPEAKERS_PER_ROUND = 5;
 const MAX_DISCUSSION_ROUNDS = 5;
-const REPETITION_THRESHOLD = 0.85; // Only block near-identical messages
 
 @Injectable({ providedIn: 'root' })
 export class DiscussionEngineService {
@@ -70,12 +69,6 @@ export class DiscussionEngineService {
           this.chatStore.appendStreamChunk(messageId, chunk);
         }
 
-        if (this.isRepetitive(roomId, fullContent)) {
-          console.info(
-            `[DiscussionEngine] 角色 ${character.name} 与近期消息相似度较高（仍显示）`
-          );
-        }
-
         this.chatStore.finalizeStreamedMessage(messageId);
 
         // Append this speaker's message to the rolling context for the next speaker
@@ -84,51 +77,5 @@ export class DiscussionEngineService {
         this.chatStore.finalizeStreamedMessage(messageId);
       }
     }
-  }
-
-  /**
-   * Simple Jaccard-style word-level repetition check against the most recent
-   * messages in the room. Returns true if the new content is too similar to
-   * any recent message.
-   */
-  private isRepetitive(roomId: string, newContent: string): boolean {
-    const recentMessages = this.chatStore
-      .messagesForRoom(roomId)
-      .filter((m) => m.role === 'assistant')
-      .slice(-3);
-
-    if (!recentMessages.length) {
-      return false;
-    }
-
-    const newWords = this.tokenize(newContent);
-    if (newWords.size === 0) {
-      return false;
-    }
-
-    for (const msg of recentMessages) {
-      const existingWords = this.tokenize(msg.content);
-      if (existingWords.size === 0) {
-        continue;
-      }
-      const intersection = new Set([...newWords].filter((w) => existingWords.has(w)));
-      const union = new Set([...newWords, ...existingWords]);
-      const similarity = intersection.size / union.size;
-      if (similarity >= REPETITION_THRESHOLD) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private tokenize(text: string): Set<string> {
-    // Split on whitespace and punctuation, filter short tokens
-    return new Set(
-      text
-        .toLowerCase()
-        .split(/[\s，。！？、,.!?]+/)
-        .filter((w) => w.length >= 2)
-    );
   }
 }
