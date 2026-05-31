@@ -16,6 +16,26 @@
         (ngModelChange)="name.set($event)"
         placeholder="输入你的昵称"
       />
+
+      <label for="userLocation">位置</label>
+      <input
+        id="userLocation"
+        type="text"
+        name="userLocation"
+        [ngModel]="location()"
+        (ngModelChange)="location.set($event)"
+        placeholder="例如：北京、上海、东京"
+      />
+
+      <label for="userBackground">经历</label>
+      <textarea
+        id="userBackground"
+        name="userBackground"
+        [ngModel]="background()"
+        (ngModelChange)="background.set($event)"
+        placeholder="简单介绍一下你自己，例如：我是一名程序员，喜欢动漫和游戏..."
+        rows="3"
+      ></textarea>
     </section>
 
     <section class="card">

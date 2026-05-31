@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { RoomStore } from '../../store/room.store';
+import { StorageService } from '../storage/storage.service';
 import { Action, Character, ExecutionPlan, Role } from '../../shared/types/chat.types';
 import { LlmService } from '../llm/llm.service';
 import { MemoryCompressorService } from '../memory/memory-compressor.service';
@@ -29,6 +30,7 @@ export class HaikuService {
     private readonly characterStore: CharacterStore,
     private readonly chatStore: ChatStore,
     private readonly roomStore: RoomStore,
+    private readonly storageService: StorageService,
     private readonly memoryCompressor: MemoryCompressorService,
     private readonly llmService: LlmService
   ) {}
@@ -118,12 +120,16 @@ export class HaikuService {
     //   Round 1-5 = AI-to-AI dialogue
     if (charactersToSpeak.length >= 1) {
       const speakerIds = charactersToSpeak.map((c) => c.id);
+      const userState = this.storageService.read().user;
 
       actions.push({
         type: 'trigger_discussion',
         round: 0,
         speakers: speakerIds,
-        userContent
+        userContent,
+        userName: userState.name || undefined,
+        userLocation: userState.location || undefined,
+        userBackground: userState.background || undefined
       });
     }
 

@@ -4,23 +4,24 @@ import { ChatMessage } from '../../shared/types/chat.types';
 import { StorageService } from '../storage/storage.service';
 
 const POSITIVE_SIGNALS = [
-  '谢谢', '感谢', '好', '棒', '厉害', '喜欢', '爱', '赞', '❤', '哈哈',
-  '有趣', '有意思', '对', '没错', '同意', '确实', '太好了', '不错',
-  'thanks', 'good', 'great', 'love', 'nice', 'yes', 'agree', 'awesome'
+  '谢谢', '感谢', '很棒', '厉害', '喜欢', '爱你', '赞', '❤', '哈哈',
+  '有趣', '有意思', '没错', '同意', '确实', '太好了', '不错', '真好',
+  'thanks', 'great', 'love', 'nice', 'agree', 'awesome', 'wow'
 ];
 
 const NEGATIVE_SIGNALS = [
-  '不', '错', '讨厌', '无聊', '烦', '滚', '垃圾', '差',
-  'no', 'wrong', 'bad', 'boring', 'hate', 'terrible'
+  '讨厌', '无聊', '烦死了', '滚', '垃圾', '很差', '恶心',
+  'wrong', 'bad', 'boring', 'hate', 'terrible', 'stupid'
 ];
 
 const BASE_AFFINITY = 0.2;
-const REPLY_BONUS = 0.02;       // Per character reply
-const POSITIVE_BONUS = 0.05;    // Per positive signal
-const NEGATIVE_PENALTY = 0.06;  // Per negative signal
-const LONG_MESSAGE_BONUS = 0.03; // User long message → engaged
-const NAME_MENTION_BONUS = 0.04; // User mentions character by name
-const DECAY_RATE = 0.005;       // Per turn without interaction
+const REPLY_BONUS = 0.01;       // Per character reply
+const POSITIVE_BONUS = 0.02;    // Per positive signal (capped per message)
+const NEGATIVE_PENALTY = 0.04;  // Per negative signal (capped per message)
+const MAX_SIGNAL_BONUS = 0.06;  // Max total signal bonus per message
+const LONG_MESSAGE_BONUS = 0.01; // User long message → engaged
+const NAME_MENTION_BONUS = 0.02; // User mentions character by name
+const DECAY_RATE = 0.01;        // Per turn without interaction
 
 @Injectable({ providedIn: 'root' })
 export class UserAffinityService {
@@ -86,11 +87,11 @@ export class UserAffinityService {
       }
 
       if (posCount > 0 || negCount > 0) {
-        // Apply to all participating characters
+        // Apply to all participating characters, capped per message
+        const rawBonus = posCount * POSITIVE_BONUS - negCount * NEGATIVE_PENALTY;
+        const capped = Math.max(-MAX_SIGNAL_BONUS, Math.min(MAX_SIGNAL_BONUS, rawBonus));
         for (const id of characterIds) {
-          affinity[id] = this.clamp(
-            affinity[id] + posCount * POSITIVE_BONUS - negCount * NEGATIVE_PENALTY
-          );
+          affinity[id] = this.clamp(affinity[id] + capped);
         }
       }
     }

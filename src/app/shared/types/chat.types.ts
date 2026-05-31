@@ -83,6 +83,14 @@ export type Action =
       round: number;
       speakers: string[];
       userContent?: string;
+      userName?: string;
+      userLocation?: string;
+      userBackground?: string;
+    }
+  | {
+      type: 'web_search';
+      query: string;
+      storeAsMemory?: boolean;
     }
   | {
       type: 'ui_event';
@@ -108,6 +116,8 @@ export interface AppStorageState {
   };
   user: {
     name: string;
+    location: string;
+    background: string;
     profile: Record<string, unknown>;
     preferences: Record<string, unknown>;
   };

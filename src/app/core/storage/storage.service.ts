@@ -14,6 +14,8 @@ const DEFAULT_STATE: AppStorageState = {
   },
   user: {
     name: '',
+    location: '',
+    background: '',
     profile: {},
     preferences: {}
   },

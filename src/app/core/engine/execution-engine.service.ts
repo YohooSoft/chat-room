@@ -9,6 +9,7 @@ import { RelationEvolutionService } from '../discussion/relation-evolution.servi
 import { UserAffinityService } from '../haiku/user-affinity.service';
 import { LlmService } from '../llm/llm.service';
 import { MemoryService } from '../memory/memory.service';
+import { WebSearchService } from '../search/web-search.service';
 
 @Injectable({ providedIn: 'root' })
 export class ExecutionEngineService {
@@ -18,6 +19,7 @@ export class ExecutionEngineService {
     private readonly discussionEngine: DiscussionEngineService,
     private readonly relationEvolution: RelationEvolutionService,
     private readonly userAffinity: UserAffinityService,
+    private readonly webSearchService: WebSearchService,
     private readonly characterStore: CharacterStore,
     private readonly uiStore: UiStore,
     private readonly chatStore: ChatStore
@@ -59,7 +61,15 @@ export class ExecutionEngineService {
           break;
         case 'trigger_discussion':
           action.speakers.forEach((id) => participants.add(id));
-          await this.discussionEngine.run(plan.roomId, action.round, action.speakers, action.userContent);
+          await this.discussionEngine.run(
+            plan.roomId,
+            action.round,
+            action.speakers,
+            action.userContent,
+            action.userName,
+            action.userLocation,
+            action.userBackground
+          );
           break;
         case 'ui_event':
           this.uiStore.update(action.event);
@@ -67,6 +77,16 @@ export class ExecutionEngineService {
         case 'system_message':
           this.chatStore.addAiMessage(plan.roomId, '系统', action.content);
           break;
+        case 'web_search': {
+          try {
+            await this.webSearchService.search(plan.roomId, action.query);
+            // Results cached; consumed by DiscussionEngine during character response
+          } catch (err) {
+            console.warn(`[ExecutionEngine] 网络搜索失败: ${err instanceof Error ? err.message : '未知错误'}`);
+            // Non-fatal: conversation continues without search results
+          }
+          break;
+        }
         default:
           break;
       }

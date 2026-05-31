@@ -39,6 +39,8 @@ export class SettingsComponent {
   readonly providers = ['openai', 'claude', 'gemini', 'openai-compatible'];
 
   readonly name = signal('');
+  readonly location = signal('');
+  readonly background = signal('');
   readonly provider = signal(DEFAULT_PROVIDER);
   readonly model = signal(DEFAULT_MODEL);
   readonly temperature = signal(DEFAULT_TEMPERATURE);
@@ -116,6 +118,8 @@ export class SettingsComponent {
       user: {
         ...state.user,
         name: this.name(),
+        location: this.location(),
+        background: this.background(),
         preferences
       }
     };
@@ -298,6 +302,8 @@ export class SettingsComponent {
     const state = this.storageService.read();
     const preferences = state.user.preferences as UserPreferences;
     this.name.set(state.user.name ?? '');
+    this.location.set(state.user.location ?? '');
+    this.background.set(state.user.background ?? '');
     this.provider.set(preferences.defaultProvider ?? DEFAULT_PROVIDER);
     this.model.set(preferences.defaultModel ?? DEFAULT_MODEL);
     this.temperature.set(
