@@ -11,6 +11,9 @@ interface UserPreferences extends Record<string, unknown> {
 }
 
 const SAVE_MESSAGE_PREFIX = '已保存';
+const DEFAULT_PROVIDER = 'openai';
+const DEFAULT_MODEL = 'gpt-4o-mini';
+const DEFAULT_TEMPERATURE = 0.7;
 
 @Component({
   selector: 'app-settings',
@@ -25,9 +28,9 @@ export class SettingsComponent {
   readonly providers = ['openai', 'claude', 'gemini', 'openai-compatible'];
 
   readonly name = signal('');
-  readonly provider = signal('openai');
-  readonly model = signal('gpt-4o-mini');
-  readonly temperature = signal(0.7);
+  readonly provider = signal(DEFAULT_PROVIDER);
+  readonly model = signal(DEFAULT_MODEL);
+  readonly temperature = signal(DEFAULT_TEMPERATURE);
   readonly savedMessage = signal('');
 
   private readonly storageState = signal<AppStorageState>(this.storageService.read());
@@ -94,10 +97,12 @@ export class SettingsComponent {
     this.storageState.set(state);
     const preferences = state.user.preferences as UserPreferences;
     this.name.set(state.user.name ?? '');
-    this.provider.set(preferences.defaultProvider ?? 'openai');
-    this.model.set(preferences.defaultModel ?? 'gpt-4o-mini');
+    this.provider.set(preferences.defaultProvider ?? DEFAULT_PROVIDER);
+    this.model.set(preferences.defaultModel ?? DEFAULT_MODEL);
     this.temperature.set(
-      typeof preferences.defaultTemperature === 'number' ? preferences.defaultTemperature : 0.7
+      typeof preferences.defaultTemperature === 'number'
+        ? preferences.defaultTemperature
+        : DEFAULT_TEMPERATURE
     );
   }
 }
