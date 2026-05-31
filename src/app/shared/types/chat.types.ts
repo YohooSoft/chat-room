@@ -86,6 +86,10 @@ export type Action =
   | {
       type: 'ui_event';
       event: 'typing' | 'stop_typing' | 'end_turn';
+    }
+  | {
+      type: 'system_message';
+      content: string;
     };
 
 export interface ExecutionPlan {

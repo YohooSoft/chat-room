@@ -20,6 +20,7 @@ export class DiscussionEngineService {
   async run(roomId: string, round: number, speakers: string[]): Promise<void> {
     if (round > MAX_DISCUSSION_ROUNDS) {
       console.info(`[DiscussionEngine] 达到最大讨论轮次 ${MAX_DISCUSSION_ROUNDS}，停止讨论`);
+      this.chatStore.addAiMessage(roomId, '系统', `讨论已达 ${MAX_DISCUSSION_ROUNDS} 轮上限。发送任意内容继续对话。`);
       return;
     }
 

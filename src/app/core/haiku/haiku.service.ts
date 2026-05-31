@@ -32,7 +32,7 @@ const MEMORY_SIGNIFICANT_KEYWORDS = [
 // Character engagement: how many consecutive turns a character can participate
 // before needing a cooldown. Tracked per character per room via message history.
 const CHARACTER_COOLDOWN_TURNS = 1;
-const RELEVANCE_THRESHOLD = 0.3; // Minimum relevance score to speak (0~1)
+const RELEVANCE_THRESHOLD = 0.15; // Minimum relevance score to speak (0~1)
 const MIN_RELEVANT_CHARACTERS = 1; // Always let at least 1 character speak
 
 @Injectable({ providedIn: 'root' })
@@ -273,8 +273,14 @@ export class HaikuService {
   private computeDiscussionRound(
     messages: Array<{ role: string; content: string }>
   ): number {
-    const recentAiMessages = messages.filter((m) => m.role === 'assistant').length;
-    return Math.min(MAX_DISCUSSION_ROUNDS, Math.max(1, Math.ceil(recentAiMessages / 3)));
+    // Count AI messages since the LAST user message (not including the incoming one).
+    // This resets when the user sends a new message (= "continue").
+    let aiCount = 0;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') break;
+      aiCount++;
+    }
+    return Math.min(MAX_DISCUSSION_ROUNDS, Math.max(1, Math.ceil(aiCount / 3)));
   }
 
   // ── Relevance Scoring ────────────────────────────────────────────

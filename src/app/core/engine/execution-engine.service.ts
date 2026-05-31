@@ -58,6 +58,9 @@ export class ExecutionEngineService {
         case 'ui_event':
           this.uiStore.update(action.event);
           break;
+        case 'system_message':
+          this.chatStore.addAiMessage(plan.roomId, '系统', action.content);
+          break;
         default:
           break;
       }
