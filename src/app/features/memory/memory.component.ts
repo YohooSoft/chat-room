@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 
 import { MemoryService } from '../../core/memory/memory.service';
 import { MemoryRecord } from '../../shared/types/chat.types';
@@ -43,6 +43,30 @@ export class MemoryComponent {
       '未选择角色'
     );
   });
+
+  constructor() {
+    effect(() => {
+      const rooms = this.rooms();
+      const currentId = this.selectedRoomId();
+      if (!rooms.length) {
+        return;
+      }
+      if (!currentId || !rooms.some((room) => room.id === currentId)) {
+        this.selectedRoomId.set(rooms[0].id);
+      }
+    });
+
+    effect(() => {
+      const characters = this.characters();
+      const currentId = this.selectedCharacterId();
+      if (!characters.length) {
+        return;
+      }
+      if (!currentId || !characters.some((character) => character.id === currentId)) {
+        this.selectedCharacterId.set(characters[0].id);
+      }
+    });
+  }
 
   setScope(scope: 'room' | 'character'): void {
     this.scope.set(scope);

@@ -63,7 +63,7 @@
               <ul>
                 @for (relation of relationEntries(character); track relation.id) {
                   <li>
-                    {{ relation.id }}：亲密度 {{ relation.closeness }}，信任度 {{ relation.trust }}
+                    {{ relation.name }}：亲密度 {{ relation.closeness }}，信任度 {{ relation.trust }}
                   </li>
                 }
               </ul>
