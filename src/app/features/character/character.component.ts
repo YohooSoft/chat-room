@@ -82,15 +82,23 @@ export class CharacterComponent {
       (c) => c.id !== (selected?.id ?? '')
     );
   });
-  readonly modelSuggestions = computed(() => {
+  /** All custom models from Settings → Model Management. */
+  readonly allCustomModels = computed(() => {
     const state = this.storageService.state();
     const customModels = (state.user.preferences as Record<string, unknown>)
-      ?.['customModels'] as Array<{ provider: string; model: string }> | undefined;
-    const list = customModels ?? [];
-    return list
-      .filter((m) => m.provider === this.draft().provider)
-      .map((m) => m.model);
+      ?.['customModels'] as Array<{ provider: string; model: string; apiKey?: string; baseUrl?: string; isGenAI?: boolean }> | undefined;
+    return customModels ?? [];
   });
+
+  /** Custom models filtered by the currently selected provider. */
+  readonly modelsForProvider = computed(() =>
+    this.allCustomModels().filter((m) => m.provider === this.draft().provider)
+  );
+
+  /** Whether the selected model matches a custom model entry (vs free-text). */
+  readonly selectedModelIsCustom = computed(() =>
+    this.modelsForProvider().some((m) => m.model === this.draft().model)
+  );
 
   constructor() {
     effect(() => {

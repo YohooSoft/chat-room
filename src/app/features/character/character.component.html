@@ -101,18 +101,28 @@
               }
             </select>
             <label>Model</label>
-            <input
-              type="text"
+            <select
               name="characterModel"
-              [ngModel]="draft().model"
-              (ngModelChange)="updateDraft({ model: $event })"
-              [attr.list]="'modelSuggestions-' + draft().provider"
-            />
-            <datalist [id]="'modelSuggestions-' + draft().provider">
-              @for (suggestion of modelSuggestions(); track suggestion) {
-                <option [value]="suggestion"></option>
+              [ngModel]="selectedModelIsCustom() ? draft().model : '__other__'"
+              (ngModelChange)="updateDraft({ model: $event === '__other__' ? draft().model : $event })"
+            >
+              @if (!modelsForProvider().length) {
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
               }
-            </datalist>
+              @for (m of modelsForProvider(); track m.model) {
+                <option [value]="m.model">{{ m.model }}</option>
+              }
+              <option value="__other__">其他（手动输入）...</option>
+            </select>
+            @if (!selectedModelIsCustom()) {
+              <input
+                type="text"
+                name="characterModelManual"
+                placeholder="手动输入模型名"
+                [ngModel]="draft().model"
+                (ngModelChange)="updateDraft({ model: $event })"
+              />
+            }
             <label>Temperature</label>
             <div class="temperature-row">
               <input
