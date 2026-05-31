@@ -45,7 +45,7 @@ export class DiscussionEngineService {
 
       const peers = otherNames.filter((n) => n !== character.name);
       const systemMsg = peers.length
-        ? `你是 ${character.name}。你正在与 ${peers.join('、')} 进行第 ${round} 轮对话。请以 ${character.name} 的身份自然回应对方，不要扮演其他角色，不要以"回复"或"${character.name}："开头。${character.personality ? `你的性格：${character.personality}` : ''}`
+        ? `你是 ${character.name}。现在进入 AI 之间的自由讨论环节（第 ${round} 轮），你正在与 ${peers.join('、')} 对话。请以 ${character.name} 的身份自然交流，像真人对话一样，不要扮演其他角色，不要以"${character.name}："开头。${character.personality ? `你的性格：${character.personality}` : ''}`
         : `你是 ${character.name}。讨论轮次 ${round}。`;
 
       const messages: Array<{ role: Role; content: string }> = [

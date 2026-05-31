@@ -158,25 +158,26 @@ export class HaikuService {
       charactersToSpeak.length >= 2;
 
     // ── Phase 4: Model Calls ────────────────────────────────────
+    // ── Phase 4: Round 1 — each character replies to the USER ──
+    for (const character of charactersToSpeak) {
+      if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
+      actions.push(this.buildModelCall(character, context, userContent));
+    }
+
+    // ── Phase 4b: Round 2+ — AI-to-AI discussion (after user replies) ──
     if (shouldTriggerDiscussion) {
       const discussionRound = this.computeDiscussionRound(roomMessages);
       const speakerIds = charactersToSpeak.map((c) => c.id);
 
       console.info(
-        `[Haiku] 触发 AI 对话队列：${charactersToSpeak.map((c) => c.name).join(' → ')} (第 ${discussionRound} 轮)`
+        `[Haiku] 触发 AI 对话（第 2+ 轮）：${charactersToSpeak.map((c) => c.name).join(' → ')}`
       );
 
-      // Discussion engine handles all speakers sequentially in a queue
       actions.push({
         type: 'trigger_discussion',
         round: discussionRound,
         speakers: speakerIds
       });
-    } else {
-      for (const character of charactersToSpeak) {
-        if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
-        actions.push(this.buildModelCall(character, context, userContent));
-      }
     }
 
     // ── Phase 5: Memory Write ───────────────────────────────────
