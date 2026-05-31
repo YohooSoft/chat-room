@@ -4,6 +4,7 @@ import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
 import { RoomStore } from '../../store/room.store';
 import { Action, Character, ExecutionPlan, Role } from '../../shared/types/chat.types';
+import { LlmService } from '../llm/llm.service';
 import { MemoryCompressorService } from '../memory/memory-compressor.service';
 
 // ── Scheduling Constants ────────────────────────────────────────────
@@ -28,7 +29,8 @@ export class HaikuService {
     private readonly characterStore: CharacterStore,
     private readonly chatStore: ChatStore,
     private readonly roomStore: RoomStore,
-    private readonly memoryCompressor: MemoryCompressorService
+    private readonly memoryCompressor: MemoryCompressorService,
+    private readonly llmService: LlmService
   ) {}
 
   /**
@@ -47,7 +49,7 @@ export class HaikuService {
    * - Discussions enforce max rounds and repetition guards
    * - Memory importance is computed via multi-factor scoring
    */
-  createPlan(roomId: string, userContent: string): ExecutionPlan {
+  async createPlan(roomId: string, userContent: string): Promise<ExecutionPlan> {
     const allCharacters = this.characterStore.characters();
 
     // System characters (Haiku) are always active as schedulers — not room-dependent
@@ -97,14 +99,17 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Characters — all get a chance, AI decides ─
-    const charactersToSpeak = this.shuffle(
-      this.selectEligibleCharacters(visibleCharacters, roomMessages)
-        .slice(0, MAX_CHARACTERS_PER_TURN)
-    );
+    // ── Phase 2: Haiku asks its own AI to judge who should reply ──
+    const eligible = this.selectEligibleCharacters(visibleCharacters, roomMessages)
+      .slice(0, MAX_CHARACTERS_PER_TURN);
+
+    const relevantNames = await this.judgeRelevance(userContent, eligible);
+    const charactersToSpeak = relevantNames.length > 0
+      ? eligible.filter((c) => relevantNames.includes(c.name))
+      : this.shuffle([...eligible]); // Fallback: all speak
 
     console.info(
-      `[Haiku] 发言: ${charactersToSpeak.map((c) => c.name).join(' → ')}（AI自行判断是否参与）`
+      `[Haiku] AI判定 → 应回复: ${charactersToSpeak.map((c) => c.name).join('、') || '(无)'}`
     );
 
     // ── Phase 3+4: Unified discussion queue ──
@@ -231,6 +236,41 @@ export class HaikuService {
     score += Math.min(0.2, messages.length * 0.02);
 
     return Math.min(1, Math.max(0, Math.round(score * 100) / 100));
+  }
+
+  /**
+   * Ask Haiku's own AI model to decide which characters should respond.
+   * Returns an array of character names that should reply.
+   */
+  private async judgeRelevance(
+    userContent: string,
+    characters: Character[]
+  ): Promise<string[]> {
+    if (characters.length <= 1) return characters.map((c) => c.name);
+
+    const charList = characters.map((c) => `${c.name}（${c.personality.slice(0, 20)}）`).join('、');
+    const prompt = `用户说：「${userContent}」\n\n房间内有以下角色：${charList}\n\n请判断哪些角色应该回复用户。只输出角色名字，多个用逗号分隔。如果用户提到具体名字，只输出那个名字。如果是对所有人说的，输出全部名字。`;
+
+    try {
+      const haikuChar = this.characterStore.characters().find((c) => c.isSystem);
+      if (!haikuChar) return [];
+
+      const response = await this.llmService.chat(haikuChar.model.provider, {
+        model: haikuChar.model.model,
+        temperature: 0.1,
+        messages: [{ role: 'user', content: prompt }]
+      });
+
+      const names = response.content
+        .split(/[,，、\n]/)
+        .map((s) => s.trim())
+        .filter((n) => characters.some((c) => c.name === n));
+
+      console.info(`[Haiku] AI判断: "${userContent.slice(0, 30)}" → ${names.join(', ') || '(无)'}`);
+      return names;
+    } catch {
+      return []; // Fallback: let all speak
+    }
   }
 
   private shuffle<T>(arr: T[]): T[] {

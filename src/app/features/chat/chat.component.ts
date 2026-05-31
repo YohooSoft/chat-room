@@ -37,6 +37,7 @@ export class ChatComponent {
   readonly usingMockMode = computed(() => !this.llmService.hasAnyApiKey());
   readonly currentMessages = computed(() =>
     this.chatStore.messagesForRoom(this.roomStore.activeRoomId())
+      .filter((m) => m.content.replace(/[。.！!？?\s]+/g, '').length >= 2)
   );
   readonly visibleCharacterCount = computed(() => {
     const room = this.roomStore.activeRoom();

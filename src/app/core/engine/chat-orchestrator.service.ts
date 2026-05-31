@@ -32,8 +32,8 @@ export class ChatOrchestratorService {
         filter((event) => event.type === 'user_message'),
         takeUntilDestroyed(this.destroyRef)
       )
-      .subscribe((event) => {
-        const plan = this.haikuService.createPlan(event.roomId, event.content);
+      .subscribe(async (event) => {
+        const plan = await this.haikuService.createPlan(event.roomId, event.content);
         void this.executionEngineService.execute(plan);
       });
   }
