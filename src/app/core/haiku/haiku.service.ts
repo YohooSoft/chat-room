@@ -9,19 +9,8 @@ import { MemoryCompressorService } from '../memory/memory-compressor.service';
 // ── Scheduling Constants ────────────────────────────────────────────
 const MAX_ACTIONS_PER_PLAN = 12;
 const MAX_CHARACTERS_PER_TURN = 4;
-const MAX_DISCUSSION_ROUNDS = 5;
 const MIN_CONTENT_LENGTH_FOR_MEMORY = 20;
-const HIGH_IMPORTANCE_THRESHOLD = 80;
 const CONTEXT_WINDOW_SIZE = 12;
-const DISCUSSION_TRIGGER_MESSAGE_COUNT = 3;
-const REPETITION_GUARD_WINDOW = 4;
-const REPETITION_JACCARD_THRESHOLD = 0.6;
-
-// Discussion trigger keywords
-const DISCUSSION_KEYWORDS = [
-  '讨论', '你们觉得', '怎么看', '说说看', '评价', '分析',
-  'think', 'discuss', 'opinion', 'review', 'analyze'
-];
 
 // Memory-significant keywords (boost importance)
 const MEMORY_SIGNIFICANT_KEYWORDS = [
@@ -118,9 +107,7 @@ export class HaikuService {
     );
 
     // ── Phase 3: Decide Discussion (2+ characters → AI dialogue) ─
-    const shouldTriggerDiscussion =
-      charactersToSpeak.length >= 2 &&
-      this.shouldTriggerDiscussion(roomMessages, userContent);
+    const shouldTriggerDiscussion = charactersToSpeak.length >= 2;
 
     // ── Phase 4: Model Calls ────────────────────────────────────
     // ── Phase 4: Round 1 — each character replies to the USER ──
@@ -129,18 +116,17 @@ export class HaikuService {
       actions.push(this.buildModelCall(character, context, userContent));
     }
 
-    // ── Phase 4b: Round 2+ — AI-to-AI discussion (after user replies) ──
+    // ── Phase 4b: AI-to-AI discussion (after user replies) ──
     if (shouldTriggerDiscussion) {
-      const discussionRound = this.computeDiscussionRound(roomMessages);
       const speakerIds = charactersToSpeak.map((c) => c.id);
 
       console.info(
-        `[Haiku] 触发 AI 对话（第 2+ 轮）：${charactersToSpeak.map((c) => c.name).join(' → ')}`
+        `[Haiku] 触发 AI 对话：${charactersToSpeak.map((c) => c.name).join(' → ')}（5轮自动循环）`
       );
 
       actions.push({
         type: 'trigger_discussion',
-        round: discussionRound,
+        round: 1,
         speakers: speakerIds
       });
     }
@@ -207,45 +193,6 @@ export class HaikuService {
 
     // Always ensure at least the first character (prioritized) is included
     return sorted.length ? sorted : characters;
-  }
-
-  // ── Discussion Logic ─────────────────────────────────────────────
-
-  /**
-   * Determine if an AI-to-AI discussion should be triggered.
-   *
-   * Triggers when:
-   * - Multiple messages have accumulated (conversation is active)
-   * - User content contains discussion-trigger keywords
-   * - Multiple characters are available
-   */
-  private shouldTriggerDiscussion(
-    messages: Array<{ role: string; content: string }>,
-    userContent: string
-  ): boolean {
-    const aiMessageCount = messages.filter((m) => m.role === 'assistant').length;
-    const hasDiscussionKeyword = DISCUSSION_KEYWORDS.some((kw) =>
-      userContent.toLowerCase().includes(kw)
-    );
-
-    return aiMessageCount >= DISCUSSION_TRIGGER_MESSAGE_COUNT || hasDiscussionKeyword;
-  }
-
-  /**
-   * Compute the next discussion round number based on message history.
-   * Caps at MAX_DISCUSSION_ROUNDS.
-   */
-  private computeDiscussionRound(
-    messages: Array<{ role: string; content: string }>
-  ): number {
-    // Count AI messages since the LAST user message (not including the incoming one).
-    // This resets when the user sends a new message (= "continue").
-    let aiCount = 0;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') break;
-      aiCount++;
-    }
-    return Math.min(MAX_DISCUSSION_ROUNDS, Math.max(1, Math.ceil(aiCount / 3)));
   }
 
   // ── Memory Logic ─────────────────────────────────────────────────

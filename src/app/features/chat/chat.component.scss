@@ -35,6 +35,68 @@
   text-decoration: underline;
 }
 
+/* ── Modal ─────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 2rem 2.5rem;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  color: #37474f;
+}
+
+.modal-dialog p {
+  margin: 0 0 1.5rem;
+  color: #607d8b;
+  font-size: 0.95rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.modal-actions .primary {
+  border: none;
+  border-radius: 999px;
+  padding: 0.55rem 1.8rem;
+  background: #1565c0;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.modal-actions .ghost {
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  padding: 0.55rem 1.8rem;
+  background: #ffffff;
+  color: #607d8b;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
 .mock-banner {
   display: flex;
   justify-content: space-between;

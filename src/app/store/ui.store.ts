@@ -4,9 +4,11 @@ import { Injectable, signal } from '@angular/core';
 export class UiStore {
   private readonly typingSignal = signal<boolean>(false);
   private readonly turnEndedSignal = signal<boolean>(false);
+  private readonly discussionPausedSignal = signal<{ roomId: string; speakers: string[] } | null>(null);
 
   readonly typing = this.typingSignal.asReadonly();
   readonly turnEnded = this.turnEndedSignal.asReadonly();
+  readonly discussionPaused = this.discussionPausedSignal.asReadonly();
 
   update(event: 'typing' | 'stop_typing' | 'end_turn'): void {
     switch (event) {
@@ -22,5 +24,13 @@ export class UiStore {
         this.turnEndedSignal.set(true);
         return;
     }
+  }
+
+  pauseDiscussion(roomId: string, speakers: string[]): void {
+    this.discussionPausedSignal.set({ roomId, speakers });
+  }
+
+  resumeDiscussion(): void {
+    this.discussionPausedSignal.set(null);
   }
 }

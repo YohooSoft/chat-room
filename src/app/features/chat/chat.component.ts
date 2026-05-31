@@ -50,7 +50,21 @@ export class ChatComponent {
 
   senderName(senderId: string): string {
     if (senderId === 'user') return '你';
+    if (senderId === '系统') return '系统';
     return this.characterStore.byId()[senderId]?.name ?? senderId;
+  }
+
+  continueDiscussion(): void {
+    const paused = this.uiStore.discussionPaused();
+    if (!paused) return;
+    const roomId = paused.roomId;
+    this.uiStore.resumeDiscussion();
+    this.chatStore.addUserMessage(roomId, '继续讨论');
+    this.eventBus.emit({ type: 'user_message', roomId, content: '继续讨论' });
+  }
+
+  stopDiscussion(): void {
+    this.uiStore.resumeDiscussion();
   }
 
   constructor() {

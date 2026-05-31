@@ -2,80 +2,94 @@ import { Injectable } from '@angular/core';
 
 import { CharacterStore } from '../../store/character.store';
 import { ChatStore } from '../../store/chat.store';
+import { UiStore } from '../../store/ui.store';
 import { LlmService } from '../llm/llm.service';
 import { Role } from '../../shared/types/chat.types';
 
 const MAX_SPEAKERS_PER_ROUND = 5;
-const MAX_DISCUSSION_ROUNDS = 5;
+const MAX_TOTAL_ROUNDS = 5;
 
 @Injectable({ providedIn: 'root' })
 export class DiscussionEngineService {
   constructor(
     private readonly characterStore: CharacterStore,
     private readonly llmService: LlmService,
-    private readonly chatStore: ChatStore
+    private readonly chatStore: ChatStore,
+    private readonly uiStore: UiStore
   ) {}
 
-  async run(roomId: string, round: number, speakers: string[]): Promise<void> {
-    if (round > MAX_DISCUSSION_ROUNDS) {
-      console.info(`[DiscussionEngine] 达到最大讨论轮次 ${MAX_DISCUSSION_ROUNDS}，停止讨论`);
-      this.chatStore.addAiMessage(roomId, '系统', `讨论已达 ${MAX_DISCUSSION_ROUNDS} 轮上限。发送任意内容继续对话。`);
-      return;
-    }
-
-    const speakerCount = Math.min(speakers.length, Math.max(1, Math.min(round + 1, MAX_SPEAKERS_PER_ROUND)));
+  /**
+   * Run multi-round AI-to-AI discussion.
+   * Each round: every speaker takes one turn, seeing all previous messages.
+   * After MAX_TOTAL_ROUNDS rounds, pauses and shows a modal asking the user
+   * whether to continue.
+   */
+  async run(roomId: string, _round: number, speakers: string[]): Promise<void> {
+    const speakerCount = Math.min(speakers.length, MAX_SPEAKERS_PER_ROUND);
     const activeSpeakers = speakers.slice(0, speakerCount);
-
-    // Gather room context so each speaker knows the conversation history
-    const roomMessages = this.chatStore.messagesForRoom(roomId);
-    const recentContext: Array<{ role: Role; content: string }> = roomMessages
-      .slice(-6)
-      .map((m) => ({
-        role: m.role === 'assistant' ? 'assistant' as Role : 'user' as Role,
-        content: m.senderId === 'user' ? m.content : `[${m.senderId}]: ${m.content}`
-      }));
+    if (activeSpeakers.length < 2) return;
 
     const otherNames = activeSpeakers
       .map((id) => this.characterStore.getCharacter(id)?.name)
       .filter(Boolean);
 
-    for (const speakerId of activeSpeakers) {
-      const character = this.characterStore.getCharacter(speakerId);
-      if (!character) continue;
+    // Build initial context from recent room messages
+    const roomMessages = this.chatStore.messagesForRoom(roomId);
+    const context: Array<{ role: Role; content: string }> = roomMessages
+      .slice(-8)
+      .map((m) => ({
+        role: m.role === 'assistant' ? ('assistant' as Role) : ('user' as Role),
+        content: m.senderId === 'user' ? m.content : `[${m.senderId}]: ${m.content}`
+      }));
 
-      const peers = otherNames.filter((n) => n !== character.name);
-      const systemMsg = peers.length
-        ? `你是 ${character.name}。现在进入 AI 之间的自由讨论环节（第 ${round} 轮），你正在与 ${peers.join('、')} 对话。请以 ${character.name} 的身份自然交流，像真人对话一样，不要扮演其他角色，不要以"${character.name}："开头。${character.personality ? `你的性格：${character.personality}` : ''}`
-        : `你是 ${character.name}。讨论轮次 ${round}。`;
+    for (let round = 1; round <= MAX_TOTAL_ROUNDS; round++) {
+      console.info(`[DiscussionEngine] AI 对话第 ${round}/${MAX_TOTAL_ROUNDS} 轮`);
 
-      const messages: Array<{ role: Role; content: string }> = [
-        { role: 'system', content: systemMsg },
-        ...recentContext,
-        { role: 'user' as Role, content: peers.length ? `请以 ${character.name} 的身份回应。` : '请回应。' }
-      ];
+      for (const speakerId of activeSpeakers) {
+        const character = this.characterStore.getCharacter(speakerId);
+        if (!character) continue;
 
-      const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
+        const peers = otherNames.filter((n) => n !== character.name);
+        const systemMsg = peers.length
+          ? `你是 ${character.name}。这是 AI 对话第 ${round} 轮，你正在与 ${peers.join('、')} 交流。请以 ${character.name} 的身份自然回应，像真人对话一样。${character.personality ? `你的性格：${character.personality}` : ''}`
+          : `你是 ${character.name}。讨论轮次 ${round}。`;
 
-      try {
-        const stream = this.llmService.chatStream(character.model.provider, {
-          model: character.model.model,
-          temperature: character.model.temperature,
-          messages
-        });
+        const messages: Array<{ role: Role; content: string }> = [
+          { role: 'system', content: systemMsg },
+          ...context,
+          { role: 'user' as Role, content: `请以 ${character.name} 的身份回应。` }
+        ];
 
-        let fullContent = '';
-        for await (const chunk of stream) {
-          fullContent += chunk;
-          this.chatStore.appendStreamChunk(messageId, chunk);
+        const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
+
+        try {
+          const stream = this.llmService.chatStream(character.model.provider, {
+            model: character.model.model,
+            temperature: character.model.temperature,
+            messages
+          });
+
+          let fullContent = '';
+          for await (const chunk of stream) {
+            fullContent += chunk;
+            this.chatStore.appendStreamChunk(messageId, chunk);
+          }
+
+          this.chatStore.finalizeStreamedMessage(messageId);
+
+          // Append to rolling context so the NEXT speaker sees this
+          context.push({
+            role: 'assistant' as Role,
+            content: `[${character.name}]: ${fullContent}`
+          });
+        } catch {
+          this.chatStore.finalizeStreamedMessage(messageId);
         }
-
-        this.chatStore.finalizeStreamedMessage(messageId);
-
-        // Append this speaker's message to the rolling context for the next speaker
-        recentContext.push({ role: 'assistant' as Role, content: `[${character.name}]: ${fullContent}` });
-      } catch {
-        this.chatStore.finalizeStreamedMessage(messageId);
       }
     }
+
+    // All rounds complete — pause and ask user
+    console.info(`[DiscussionEngine] ${MAX_TOTAL_ROUNDS} 轮完成，弹窗询问`);
+    this.uiStore.pauseDiscussion(roomId, speakers);
   }
 }
