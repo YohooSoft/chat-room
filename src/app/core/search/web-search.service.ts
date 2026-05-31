@@ -396,13 +396,17 @@ export class WebSearchService {
   }
 
   private handleSearchError(err: unknown, query: string): WebSearchResult {
-    const message = err instanceof DOMException && err.name === 'AbortError'
-      ? '搜索超时'
-      : err instanceof TypeError
-        ? '网络请求失败'
-        : err instanceof Error
-          ? err.message
-          : '搜索失败';
+    let message: string;
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      message = '搜索超时';
+    } else if (err instanceof TypeError) {
+      // In browsers, TypeError from fetch is almost always CORS
+      message = '网络请求失败（可能是 CORS 跨域限制，请使用返回 JSON 的 API 端点，而非搜索引擎的 HTML 页面）';
+    } else if (err instanceof Error) {
+      message = err.message;
+    } else {
+      message = '搜索失败';
+    }
     console.warn(`[WebSearch] 搜索失败: ${message}`);
     return { query, formatted: '', error: message };
   }

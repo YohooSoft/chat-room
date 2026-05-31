@@ -98,20 +98,19 @@ export class ExecutionEngineService {
       this.relationEvolution.evolve(recentMessages, [...participants]);
     }
 
-    // ── Evaluate user↔character affinity (Haiku judges) ────────────
+    // ── Evaluate user↔character affinity (AI inference by Haiku) ──
     // Exclude system characters (Haiku = the invisible hand, not a person)
     const visibleParticipants = [...participants].filter((id) => {
       const c = this.characterStore.getCharacter(id);
       return c && !c.isSystem;
     });
     if (visibleParticipants.length >= 1) {
-      const recentMessages = this.chatStore.messagesForRoom(plan.roomId).slice(-10);
       const nameMap = new Map<string, string>();
       for (const id of visibleParticipants) {
         const c = this.characterStore.getCharacter(id);
         if (c) nameMap.set(id, c.name);
       }
-      this.userAffinity.evaluate(visibleParticipants, recentMessages, nameMap);
+      await this.userAffinity.evaluate(plan.roomId, visibleParticipants, nameMap);
     }
   }
 }

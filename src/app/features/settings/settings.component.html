@@ -100,7 +100,7 @@
           (ngModelChange)="searchCustomUrl.set($event)"
           placeholder="https://api.example.com/search?q={{ '{' }}query{{ '}' }}"
         />
-        <p class="hint">使用 {{ '{' }}query{{ '}' }} 作为搜索词的占位符。返回 JSON 格式。</p>
+        <p class="hint">使用 {{ '{' }}query{{ '}' }} 作为搜索词的占位符。端点需返回 JSON 格式且支持 CORS（不能直接填 Google/Bing 搜索页地址）。可自建 SearXNG 或使用兼容 API。</p>
 
         <label for="searchApiKey">API Key（可选）</label>
         <input
