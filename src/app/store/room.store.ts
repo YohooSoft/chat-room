@@ -7,7 +7,7 @@ import { StorageService } from '../core/storage/storage.service';
 const DEFAULT_ROOM: Room = {
   id: 'main-room',
   name: '主舞台',
-  characterIds: ['director', 'critic']
+  characterIds: ['haiku']
 };
 
 @Injectable({ providedIn: 'root' })

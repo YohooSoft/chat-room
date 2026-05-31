@@ -9,12 +9,25 @@ interface CustomModel {
   model: string;
 }
 
+interface ProviderApiConfig {
+  apiKey: string;
+  baseUrl: string;
+}
+
 interface UserPreferences extends Record<string, unknown> {
   defaultProvider?: string;
   defaultModel?: string;
   defaultTemperature?: number;
   customModels?: CustomModel[];
+  providerApiKeys?: Record<string, ProviderApiConfig>;
 }
+
+const DEFAULT_PROVIDER_BASE_URLS: Record<string, string> = {
+  openai: 'https://api.openai.com/v1',
+  claude: 'https://api.anthropic.com/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  'openai-compatible': ''
+};
 
 const SAVE_MESSAGE_PREFIX = '已保存';
 const DEFAULT_PROVIDER = 'openai';
@@ -44,6 +57,10 @@ export class SettingsComponent {
   readonly modelSearch = signal('');
   readonly newModelProvider = signal(DEFAULT_PROVIDER);
   readonly newModelName = signal('');
+
+  // API keys
+  readonly apiKeys = signal<Record<string, ProviderApiConfig>>({});
+  readonly showApiKeys = signal(false);
 
   readonly filteredModels = computed(() => {
     const search = this.modelSearch().toLowerCase().trim();
@@ -91,7 +108,8 @@ export class SettingsComponent {
       defaultProvider: this.provider(),
       defaultModel: this.model(),
       defaultTemperature: this.temperature(),
-      customModels: this.customModels()
+      customModels: this.customModels(),
+      providerApiKeys: this.apiKeys()
     };
     const nextState: AppStorageState = {
       ...state,
@@ -103,6 +121,33 @@ export class SettingsComponent {
     };
     this.storageService.write(nextState);
     this.savedMessage.set(`${SAVE_MESSAGE_PREFIX} ${new Date().toLocaleTimeString('zh-CN')}`);
+  }
+
+  // API key management
+  updateApiKey(provider: string, apiKey: string): void {
+    this.apiKeys.update((keys) => ({
+      ...keys,
+      [provider]: { ...(keys[provider] ?? { apiKey: '', baseUrl: '' }), apiKey }
+    }));
+  }
+
+  updateBaseUrl(provider: string, baseUrl: string): void {
+    this.apiKeys.update((keys) => ({
+      ...keys,
+      [provider]: { ...(keys[provider] ?? { apiKey: '', baseUrl: '' }), baseUrl }
+    }));
+  }
+
+  getApiKey(provider: string): string {
+    return this.apiKeys()[provider]?.apiKey ?? '';
+  }
+
+  getBaseUrl(provider: string): string {
+    return this.apiKeys()[provider]?.baseUrl ?? DEFAULT_PROVIDER_BASE_URLS[provider] ?? '';
+  }
+
+  getDefaultBaseUrl(provider: string): string {
+    return DEFAULT_PROVIDER_BASE_URLS[provider] ?? '';
   }
 
   // Model management methods
@@ -158,5 +203,6 @@ export class SettingsComponent {
         : DEFAULT_TEMPERATURE
     );
     this.customModels.set(preferences.customModels ?? []);
+    this.apiKeys.set(preferences.providerApiKeys ?? {});
   }
 }

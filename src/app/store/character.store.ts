@@ -6,28 +6,15 @@ import { StorageService } from '../core/storage/storage.service';
 
 const DEFAULT_CHARACTERS: Character[] = [
   {
-    id: 'director',
-    name: '导演AI',
-    personality: '擅长推进剧情和分配角色任务',
-    background: '戏剧总导演',
+    id: 'haiku',
+    name: 'Haiku',
+    personality: '既是导演也是评论家，能推进剧情、分配角色，同时关注逻辑一致性和人物动机',
+    background: 'AI Drama Engine 核心调度者，身兼导演与评论家双职',
     promptMode: 'auto',
     model: {
       provider: 'openai',
       model: 'gpt-4o-mini',
       temperature: 0.7
-    },
-    relations: {}
-  },
-  {
-    id: 'critic',
-    name: '评论家AI',
-    personality: '关注逻辑一致性和人物动机',
-    background: '戏剧评论家',
-    promptMode: 'auto',
-    model: {
-      provider: 'claude',
-      model: 'claude-3-5-sonnet',
-      temperature: 0.6
     },
     relations: {}
   }
@@ -36,6 +23,9 @@ const DEFAULT_CHARACTERS: Character[] = [
 const DEFAULT_PROVIDER = 'openai';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 const DEFAULT_TEMPERATURE = 0.7;
+
+/** System characters that cannot be deleted. */
+const PROTECTED_CHARACTER_IDS = new Set(['haiku']);
 
 @Injectable({ providedIn: 'root' })
 export class CharacterStore {
@@ -86,7 +76,15 @@ export class CharacterStore {
     this.persist(nextCharacters);
   }
 
+  isProtected(characterId: string): boolean {
+    return PROTECTED_CHARACTER_IDS.has(characterId);
+  }
+
   deleteCharacter(characterId: string): void {
+    if (this.isProtected(characterId)) {
+      console.info(`[CharacterStore] 角色 ${characterId} 为系统保护角色，不可删除`);
+      return;
+    }
     const nextCharacters = this.charactersSignal().filter(
       (character) => character.id !== characterId
     );

@@ -47,6 +47,46 @@ export class ChatStore {
     return message;
   }
 
+  /**
+   * Create a placeholder message for streaming. Returns its ID.
+   * The message will have empty content initially; appendStreamChunk
+   * builds it up, and finalizeStreamedMessage persists it.
+   */
+  beginStreamingMessage(roomId: string, senderId: string): string {
+    const id = createId();
+    const placeholder: ChatMessage = {
+      id,
+      roomId,
+      role: 'assistant',
+      senderId,
+      content: '',
+      createdAt: Date.now()
+    };
+    this.messagesSignal.update((messages) => [...messages, placeholder]);
+    return id;
+  }
+
+  /**
+   * Append a chunk of text to a streaming message.
+   */
+  appendStreamChunk(messageId: string, chunk: string): void {
+    this.messagesSignal.update((messages) =>
+      messages.map((m) =>
+        m.id === messageId ? { ...m, content: m.content + chunk } : m
+      )
+    );
+  }
+
+  /**
+   * Finalize a streaming message — persist it to localStorage.
+   */
+  finalizeStreamedMessage(messageId: string): void {
+    const message = this.messagesSignal().find((m) => m.id === messageId);
+    if (message && message.content) {
+      this.persist(message);
+    }
+  }
+
   messagesForRoom(roomId: string): ChatMessage[] {
     return this.visibleMessages().filter((message: ChatMessage) => message.roomId === roomId);
   }

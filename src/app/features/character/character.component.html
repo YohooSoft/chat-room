@@ -17,12 +17,14 @@
             <div class="character-name">{{ character.name }}</div>
             <div class="character-meta">{{ character.background }}</div>
           </button>
-          <button
-            type="button"
-            class="delete-btn"
-            title="删除角色"
-            (click)="$event.stopPropagation(); deleteCharacter(character.id)"
-          >×</button>
+          @if (!characterStore.isProtected(character.id)) {
+            <button
+              type="button"
+              class="delete-btn"
+              title="删除角色"
+              (click)="$event.stopPropagation(); deleteCharacter(character.id)"
+            >×</button>
+          }
         </div>
       }
     </aside>
