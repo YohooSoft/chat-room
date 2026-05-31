@@ -32,6 +32,8 @@ const MEMORY_SIGNIFICANT_KEYWORDS = [
 // Character engagement: how many consecutive turns a character can participate
 // before needing a cooldown. Tracked per character per room via message history.
 const CHARACTER_COOLDOWN_TURNS = 1;
+const RELEVANCE_THRESHOLD = 0.3; // Minimum relevance score to speak (0~1)
+const MIN_RELEVANT_CHARACTERS = 1; // Always let at least 1 character speak
 
 @Injectable({ providedIn: 'root' })
 export class HaikuService {
@@ -108,13 +110,39 @@ export class HaikuService {
     // ── Phase 1: Begin Turn ─────────────────────────────────────
     actions.push({ type: 'ui_event', event: 'typing' });
 
-    // ── Phase 2: Select Eligible Characters (visible only) ──────
-    const eligibleCharacters = this.selectEligibleCharacters(visibleCharacters, roomMessages);
-    const charactersToSpeak = eligibleCharacters.slice(0, MAX_CHARACTERS_PER_TURN);
+    // ── Phase 2: Select Relevant Characters (visible only) ───────
+    // 1. Remove characters in cooldown
+    const eligible = this.selectEligibleCharacters(visibleCharacters, roomMessages);
+    // 2. Score relevance to user's message, filter irrelevant ones
+    const scored = eligible
+      .map((c) => ({ character: c, score: this.scoreRelevance(c, userContent) }))
+      .sort((a, b) => b.score - a.score);
+    // 3. Keep characters above threshold, but always at least MIN_RELEVANT_CHARACTERS
+    const relevant = scored.filter((s) => s.score >= RELEVANCE_THRESHOLD);
+    const charactersToSpeak = (
+      relevant.length >= MIN_RELEVANT_CHARACTERS
+        ? relevant
+        : scored.slice(0, MIN_RELEVANT_CHARACTERS)
+    )
+      .slice(0, MAX_CHARACTERS_PER_TURN)
+      .map((s) => s.character);
+
+    // Log relevance scores
+    if (scored.length) {
+      console.info(
+        '[Haiku] 角色相关性:',
+        scored.map((s) => `${s.character.name}:${s.score.toFixed(2)}`).join(', ')
+      );
+    }
 
     // ── Phase 3: Decide Discussion ──────────────────────────────
+    // Trigger AI-to-AI discussion when:
+    // 1. Multiple characters are relevant (>=2), OR
+    // 2. User explicitly asks for discussion (keywords)
     const shouldTriggerDiscussion =
-      this.shouldTriggerDiscussion(roomMessages, userContent) &&
+      (charactersToSpeak.length >= 2 &&
+        (this.shouldTriggerDiscussion(roomMessages, userContent) ||
+          charactersToSpeak.length >= 2)) &&
       charactersToSpeak.length >= 2;
 
     // ── Phase 4: Model Calls ────────────────────────────────────
@@ -122,18 +150,21 @@ export class HaikuService {
       const discussionRound = this.computeDiscussionRound(roomMessages);
       const speakerIds = charactersToSpeak.map((c) => c.id);
 
+      // Guide AI-to-AI exchange: build context that encourages inter-AI dialogue
+      console.info(
+        `[Haiku] 触发 AI 对话：${charactersToSpeak.map((c) => c.name).join(' ↔ ')} (第 ${discussionRound} 轮)`
+      );
+
       actions.push({
         type: 'trigger_discussion',
         round: discussionRound,
         speakers: speakerIds
       });
 
-      // After a discussion round, still let characters respond to user
-      // but with reduced count to prevent message floods
-      const postDiscussionCharacters = charactersToSpeak.slice(0, 2);
-      for (const character of postDiscussionCharacters) {
-        if (actions.length >= MAX_ACTIONS_PER_PLAN) break;
-        actions.push(this.buildModelCall(character, context, userContent));
+      // After discussion, let the most relevant character respond to user
+      const topCharacter = charactersToSpeak[0];
+      if (topCharacter && actions.length < MAX_ACTIONS_PER_PLAN) {
+        actions.push(this.buildModelCall(topCharacter, context, userContent));
       }
     } else {
       for (const character of charactersToSpeak) {
@@ -237,6 +268,32 @@ export class HaikuService {
   ): number {
     const recentAiMessages = messages.filter((m) => m.role === 'assistant').length;
     return Math.min(MAX_DISCUSSION_ROUNDS, Math.max(1, Math.ceil(recentAiMessages / 3)));
+  }
+
+  // ── Relevance Scoring ────────────────────────────────────────────
+
+  /**
+   * Score how relevant a character is to the user's message.
+   *
+   * Checks keyword overlap between the user message and the character's
+   * name, personality, and background fields. Returns 0.0 ~ 1.0.
+   */
+  private scoreRelevance(character: Character, userContent: string): number {
+    const profileText = [character.name, character.personality, character.background]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    const messageText = userContent.toLowerCase();
+
+    const profileWords = this.tokenize(profileText);
+    const messageWords = this.tokenize(messageText);
+
+    if (!profileWords.size || !messageWords.size) return 0.5; // neutral
+
+    const intersection = new Set([...messageWords].filter((w) => profileWords.has(w)));
+    const score = intersection.size / Math.max(1, messageWords.size);
+
+    return Math.round(score * 100) / 100;
   }
 
   // ── Memory Logic ─────────────────────────────────────────────────

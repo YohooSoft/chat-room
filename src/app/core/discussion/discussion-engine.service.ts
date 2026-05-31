@@ -17,19 +17,27 @@ export class DiscussionEngineService {
   ) {}
 
   async run(roomId: string, round: number, speakers: string[]): Promise<void> {
-    // Guard: enforce maximum discussion rounds
     if (round > MAX_DISCUSSION_ROUNDS) {
       console.info(`[DiscussionEngine] 达到最大讨论轮次 ${MAX_DISCUSSION_ROUNDS}，停止讨论`);
       return;
     }
 
     const speakerCount = Math.max(1, Math.min(round, MAX_SPEAKERS_PER_ROUND));
+    const activeSpeakers = speakers.slice(0, speakerCount);
 
-    for (const speakerId of speakers.slice(0, speakerCount)) {
+    // Build context: tell each speaker who else is participating
+    const otherNames = activeSpeakers
+      .map((id) => this.characterStore.getCharacter(id)?.name)
+      .filter(Boolean);
+
+    for (const speakerId of activeSpeakers) {
       const character = this.characterStore.getCharacter(speakerId);
-      if (!character) {
-        continue;
-      }
+      if (!character) continue;
+
+      const peers = otherNames.filter((n) => n !== character.name);
+      const systemMsg = peers.length
+        ? `你正在与 ${peers.join('、')} 进行第 ${round} 轮对话。请直接回应他们，像真人对话一样自然交流，不要以"回复"开头。`
+        : `讨论轮次 ${round}`;
 
       const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
 
@@ -37,7 +45,7 @@ export class DiscussionEngineService {
         const stream = this.llmService.chatStream(character.model.provider, {
           model: character.model.model,
           temperature: character.model.temperature,
-          messages: [{ role: 'system', content: `讨论轮次 ${round}` }]
+          messages: [{ role: 'system', content: systemMsg }]
         });
 
         let fullContent = '';
