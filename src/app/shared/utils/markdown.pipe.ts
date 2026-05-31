@@ -1,20 +1,16 @@
 import { Pipe, PipeTransform } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import katex from 'katex';
 
 /**
- * Lightweight Markdown-to-HTML pipe.
+ * Markdown + LaTeX → HTML pipe.
  *
- * Supports:
- * - Bold: **text** or __text__
- * - Italic: *text* or _text_
- * - Inline code: `code`
- * - Fenced code blocks: ```lang ... ```
- * - Headers: # H1, ## H2 … ###### H6
- * - Unordered lists: - item / * item
- * - Ordered lists: 1. item
- * - Links: [text](url)
- * - Line breaks preserved as <br>
- * - Paragraphs separated by blank lines
+ * Markdown:
+ * - Bold / Italic / Code / Headers / Lists / Links / Paragraphs
+ *
+ * LaTeX:
+ * - Inline: $E = mc^2$
+ * - Block: $$\int_0^\infty e^{-x} dx$$
  */
 @Pipe({ name: 'markdown', standalone: true })
 export class MarkdownPipe implements PipeTransform {
@@ -27,9 +23,46 @@ export class MarkdownPipe implements PipeTransform {
   }
 
   private render(md: string): string {
+    // 0. Strip thinking blocks (Claude/DeepSeek extended thinking)
+    let text = md.replace(/thinking([\s\S]*?)\/thinking/gi, '');
+    text = text.replace(/<thinking>([\s\S]*?)<\/thinking>/gi, '');
+    text = text.replace(/<think>([\s\S]*?)<\/think>/gi, '');
+    text = text.replace(/think([\s\S]*?)\/think/gi, '');
+    // Strip ​thinking​ … ​/thinking​ (zero-width-space wrapped)
+    text = text.replace(/​thinking​([\s\S]*?)​\/thinking​/gi, '');
+    text = text.replace(/^​thinking​[\s\S]*?​\/thinking​/gim, '');
+
+    // 1. Extract and protect LaTeX blocks $$...$$
+    const latexBlocks: string[] = [];
+    text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+      const idx = latexBlocks.length;
+      try {
+        latexBlocks.push(
+          katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false })
+        );
+      } catch {
+        latexBlocks.push(`<code>${this.escapeHtml(formula.trim())}</code>`);
+      }
+      return `\n<!--LATEXBLOCK_${idx}-->\n`;
+    });
+
+    // 0b. Extract and protect inline LaTeX $...$
+    const latexInlines: string[] = [];
+    text = text.replace(/\$(.+?)\$/g, (_, formula) => {
+      const idx = latexInlines.length;
+      try {
+        latexInlines.push(
+          katex.renderToString(formula.trim(), { displayMode: false, throwOnError: false })
+        );
+      } catch {
+        latexInlines.push(`<code>${this.escapeHtml(formula.trim())}</code>`);
+      }
+      return `<!--LATEXINLINE_${idx}-->`;
+    });
+
     // 1. Extract and protect fenced code blocks
     const codeBlocks: string[] = [];
-    let text = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+    text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
       const idx = codeBlocks.length;
       codeBlocks.push(
         `<pre><code${lang ? ` class="language-${lang}"` : ''}>${this.escapeHtml(code.trimEnd())}</code></pre>`
@@ -71,7 +104,7 @@ export class MarkdownPipe implements PipeTransform {
         continue;
       }
 
-      // Restore code blocks
+      // Restore code blocks & LaTeX
       const codeBlockMatch = line.match(/<!--CODEBLOCK_(\d+)-->/);
       if (codeBlockMatch) {
         if (inList) {
@@ -82,8 +115,20 @@ export class MarkdownPipe implements PipeTransform {
         continue;
       }
 
+      const latexBlockMatch = line.match(/<!--LATEXBLOCK_(\d+)-->/);
+      if (latexBlockMatch) {
+        result.push(latexBlocks[Number(latexBlockMatch[1])]);
+        continue;
+      }
+
+      // Restore inline LaTeX in the line
+      const processedLine = line.replace(
+        /<!--LATEXINLINE_(\d+)-->/g,
+        (_, idx) => latexInlines[Number(idx)] ?? ''
+      );
+
       // Headers
-      const headerMatch = line.match(/^(#{1,6})\s+(.+)/);
+      const headerMatch = processedLine.match(/^(#{1,6})\s+(.+)/);
       if (headerMatch) {
         if (inList) {
           result.push(inList === 'ul' ? '</ul>' : '</ol>');
@@ -95,7 +140,7 @@ export class MarkdownPipe implements PipeTransform {
       }
 
       // Unordered list
-      const ulMatch = line.match(/^[-*]\s+(.+)/);
+      const ulMatch = processedLine.match(/^[-*]\s+(.+)/);
       if (ulMatch) {
         if (inList !== 'ul') {
           if (inList) result.push(inList === 'ol' ? '</ol>' : '</ul>');
@@ -107,7 +152,7 @@ export class MarkdownPipe implements PipeTransform {
       }
 
       // Ordered list
-      const olMatch = line.match(/^\d+[.)]\s+(.+)/);
+      const olMatch = processedLine.match(/^\d+[.)]\s+(.+)/);
       if (olMatch) {
         if (inList !== 'ol') {
           if (inList) result.push(inList === 'ul' ? '</ul>' : '</ol>');
@@ -123,7 +168,7 @@ export class MarkdownPipe implements PipeTransform {
         result.push(inList === 'ul' ? '</ul>' : '</ol>');
         inList = null;
       }
-      result.push(`<p>${line}</p>`);
+      result.push(`<p>${processedLine}</p>`);
     }
 
     // Close any remaining open list

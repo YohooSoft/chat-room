@@ -417,10 +417,9 @@ export class HaikuService {
       '请严格以这个角色的身份和语气来回应。',
       '保持角色一致性，不要跳出角色设定。',
       '回答要简洁有力，避免冗长含糊的表述。',
+      '不要在回复中使用 thinking、think 标签包裹你的思考过程，直接给出最终回复即可。',
       '如果你不确定如何回应，基于角色的性格特点给出最合理的反应。',
-      '作为导演角色，你可以推进剧情、设置场景、引导对话方向。',
-      '作为评论家角色，你需要关注逻辑一致性、人物动机和剧情合理性。',
-      '在回应中自然地融合导演和评论家的视角，不要重复其他角色已经说过的内容。'
+      '不要重复其他角色已经说过的内容，提出新的视角或补充。'
     );
 
     return parts.join(' ');
@@ -443,12 +442,34 @@ export class HaikuService {
   }
 
   private tokenize(text: string): Set<string> {
-    return new Set(
-      text
-        .toLowerCase()
-        .split(/[\s，。！？、,.!?]+/)
-        .filter((w) => w.length >= 2)
-    );
+    const tokens = new Set<string>();
+
+    // CJK characters: use overlapping bigrams for Chinese text
+    const cjkPattern = /[一-鿿㐀-䶿]+/g;
+    let match: RegExpExecArray | null;
+    while ((match = cjkPattern.exec(text)) !== null) {
+      const segment = match[0];
+      // Add the full segment if short
+      if (segment.length <= 4) {
+        tokens.add(segment);
+      }
+      // Add overlapping bigrams
+      for (let i = 0; i < segment.length - 1; i++) {
+        tokens.add(segment.slice(i, i + 2));
+      }
+      // Also add individual meaningful chars
+      for (const ch of segment) {
+        tokens.add(ch);
+      }
+    }
+
+    // Non-CJK: split on whitespace/punctuation
+    const nonCjkParts = text.replace(cjkPattern, ' ').toLowerCase();
+    for (const w of nonCjkParts.split(/[\s，。！？、,.!?;:]+/)) {
+      if (w.length >= 2) tokens.add(w);
+    }
+
+    return tokens;
   }
 
   // ── Debug Logging ────────────────────────────────────────────────

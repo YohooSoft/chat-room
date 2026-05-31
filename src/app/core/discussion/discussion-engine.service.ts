@@ -6,7 +6,7 @@ import { LlmService } from '../llm/llm.service';
 
 const MAX_SPEAKERS_PER_ROUND = 5;
 const MAX_DISCUSSION_ROUNDS = 5;
-const REPETITION_THRESHOLD = 0.7;
+const REPETITION_THRESHOLD = 0.85; // Only block near-identical messages
 
 @Injectable({ providedIn: 'root' })
 export class DiscussionEngineService {
@@ -22,7 +22,8 @@ export class DiscussionEngineService {
       return;
     }
 
-    const speakerCount = Math.max(1, Math.min(round, MAX_SPEAKERS_PER_ROUND));
+    // Round 1: all speakers participate. Later rounds: scale up to MAX_SPEAKERS_PER_ROUND.
+    const speakerCount = Math.min(speakers.length, Math.max(1, Math.min(round + 1, MAX_SPEAKERS_PER_ROUND)));
     const activeSpeakers = speakers.slice(0, speakerCount);
 
     // Build context: tell each speaker who else is participating
@@ -54,15 +55,11 @@ export class DiscussionEngineService {
           this.chatStore.appendStreamChunk(messageId, chunk);
         }
 
-        // Guard: skip messages that are too similar to recent ones
+        // Guard: warn if similar to recent messages, but still show it
         if (this.isRepetitive(roomId, fullContent)) {
           console.info(
-            `[DiscussionEngine] 角色 ${character.name} 发言重复度过高，跳过此轮消息`
+            `[DiscussionEngine] 角色 ${character.name} 与近期消息相似度较高（仍显示）`
           );
-          // Remove the streaming message since it was repetitive
-          // (we can't easily remove, so we just leave it — the guard in the stream loop
-          // means the message was already being displayed. For now we accept this.)
-          continue;
         }
 
         this.chatStore.finalizeStreamedMessage(messageId);
