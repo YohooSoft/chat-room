@@ -148,18 +148,49 @@
   cursor: not-allowed;
 }
 
-.checkbox-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+.section-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #78909c;
 }
 
-.checkbox-item {
-  display: flex;
-  align-items: center;
+.character-pick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 0.4rem;
+}
+
+.character-pick-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.character-pick-card:hover {
+  border-color: #90caf9;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.1);
+}
+
+.character-pick-card.selected {
+  border-color: #1565c0;
+  background: #e3f2fd;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.15);
+}
+
+.pick-card-name {
+  font-weight: 600;
   font-size: 0.9rem;
-  color: #546e7a;
+  color: #37474f;
+}
+
+.pick-card-meta {
+  font-size: 0.78rem;
+  color: #90a4ae;
+  margin-top: 0.15rem;
 }
 
 .message-list {

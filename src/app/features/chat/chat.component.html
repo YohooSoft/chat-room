@@ -48,22 +48,24 @@
         <button
           type="button"
           class="primary"
-          [disabled]="!newRoomName().trim()"
+          [disabled]="!newRoomName().trim() || !newRoomCharacterIds().length"
           (click)="createRoom()"
         >
           创建
         </button>
       </div>
-      <div class="checkbox-group">
-        @for (character of characterStore.characters(); track character.id) {
-          <label class="checkbox-item">
-            <input
-              type="checkbox"
-              [checked]="newRoomCharacterIds().includes(character.id)"
-              (change)="toggleNewRoomCharacter(character.id)"
-            />
-            <span>{{ character.name }}</span>
-          </label>
+      <p class="section-hint">选择要加入房间的角色（至少一个）：</p>
+      <div class="character-pick-list">
+        @for (c of newRoomAvailableCharacters(); track c.id) {
+          <button
+            type="button"
+            class="character-pick-card"
+            [class.selected]="newRoomCharacterIds().includes(c.id)"
+            (click)="toggleNewRoomCharacter(c.id)"
+          >
+            <div class="pick-card-name">{{ c.name }}</div>
+            <div class="pick-card-meta">{{ c.personality.slice(0, 24) }}</div>
+          </button>
         }
       </div>
     </div>

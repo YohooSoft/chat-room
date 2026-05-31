@@ -43,6 +43,11 @@ export class ChatComponent {
     return room.characterIds.filter((id) => id !== 'haiku').length;
   });
 
+  /** Non-system characters available to add to a new room. */
+  readonly newRoomAvailableCharacters = computed(() =>
+    this.characterStore.characters().filter((c) => !c.isSystem)
+  );
+
   senderName(senderId: string): string {
     if (senderId === 'user') return '你';
     return this.characterStore.byId()[senderId]?.name ?? senderId;

@@ -188,13 +188,28 @@
             <button
               type="button"
               class="primary"
-              [disabled]="!newRoomName().trim()"
+              [disabled]="!newRoomName().trim() || !newRoomCharacterIds().length"
               (click)="createRoom()"
             >
               创建
             </button>
           </div>
-          <p class="section-hint">创建后可在当前房间中动态调整角色阵容。</p>
+          <p class="section-hint">选择角色（至少一个）：</p>
+          <div class="character-pick-list">
+            @for (c of characterStore.characters(); track c.id) {
+              @if (!c.isSystem) {
+                <button
+                  type="button"
+                  class="character-pick-card"
+                  [class.selected]="newRoomCharacterIds().includes(c.id)"
+                  (click)="toggleNewCharacter(c.id)"
+                >
+                  <div class="pick-card-name">{{ c.name }}</div>
+                  <div class="pick-card-meta">{{ c.personality.slice(0, 24) }}</div>
+                </button>
+              }
+            }
+          </div>
         </div>
       }
     </section>
