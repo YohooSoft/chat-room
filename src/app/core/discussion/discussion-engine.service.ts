@@ -44,33 +44,39 @@ export class DiscussionEngineService {
       .map((id) => this.characterStore.getCharacter(id)?.name)
       .filter((n): n is string => !!n);
 
-    // Shared context: each speaker sees all previous speakers' output
+    // ── Build context: a clean transcript of who said what ──────────
+    // Each entry keeps the original role + a speakerName label.
+    // speakerName === undefined  → user message
+    // speakerName === string     → AI character message
+    //
+    // Content is lightly cleaned: we only strip leading name-prefix
+    // patterns that LLMs sometimes add (e.g. "张三："). New messages
+    // are already cleaned at source; this is a safety net for old data.
     const context: Array<{ role: Role; content: string; speakerName?: string }> = roomMessages
-      .slice(-8)
+      .slice(-12)
       .map((m) => ({
         role: m.role === 'user' ? ('user' as Role) : ('assistant' as Role),
-        content: m.content.replace(/\[.+?\][：:]\s*/g, '').replace(/([一-鿿\w]+[：:]){1,3}\s*/g, ''),
+        content: m.content
+          .replace(/^\[.+?\][：:]\s*/, '')
+          .replace(/^[一-鿿\w]{1,12}[：:]\s*/, ''),
         speakerName: m.senderId === 'user' ? undefined : charLookup[m.senderId]?.name
       }));
 
-    // ── Build user info string ──────────────────────────────────────
     const userInfo = this.buildUserInfo(userName, userLocation, userBackground);
 
-    // ── Round 0: Sequential — each character responds to user ─────
-    console.info('[DiscussionEngine] Round 0 — 顺序回复用户');
-    const { searchHappened } = await this.runSequentialRound(
-      activeSpeakers, otherNames, context, 0, userContent, userInfo, roomId
+    // ── Round 0: each character responds to user ──────────────────
+    console.info('[DiscussionEngine] Round 0 — 角色回应');
+    const { searchHappened } = await this.runConversationRound(
+      activeSpeakers, otherNames, context, 0, userContent, userInfo, roomId, userName
     );
 
-    // If a character searched and presented results, STOP here.
-    // Don't let other characters interrupt the search presentation.
     if (searchHappened) {
       console.info('[DiscussionEngine] 搜索已展示，跳过后续轮次');
       this.webSearchService.clearResults(roomId);
       return;
     }
 
-    // ── Filter out silent characters for subsequent AI rounds ─────
+    // ── Filter responsive speakers for AI rounds ──────────────────
     const responsiveSpeakers = activeSpeakers.filter((id) => {
       const last = [...context].reverse().find((e) => e.speakerName === charLookup[id]?.name);
       return last && !isTrivial(last.content);
@@ -78,23 +84,18 @@ export class DiscussionEngineService {
 
     if (responsiveSpeakers.length >= 2) {
       for (let round = 1; round <= MAX_AI_ROUNDS; round++) {
-        console.info(`[DiscussionEngine] Round ${round}/${MAX_AI_ROUNDS} — AI 自由对话`);
-        await this.runSequentialRound(
-          responsiveSpeakers, otherNames, context, round, undefined, userInfo, roomId
+        console.info(`[DiscussionEngine] Round ${round}/${MAX_AI_ROUNDS} — AI 自由聊天`);
+        await this.runConversationRound(
+          responsiveSpeakers, otherNames, context, round, undefined, userInfo, roomId, userName
         );
       }
       console.info('[DiscussionEngine] 完成，弹窗询问');
       this.uiStore.pauseDiscussion(roomId, speakers);
     }
 
-    // Clean up search results after discussion ends
     this.webSearchService.clearResults(roomId);
   }
 
-  /**
-   * Build a concise user info string for the system prompt.
-   * Only includes fields the user has actually filled in.
-   */
   private buildUserInfo(name?: string, location?: string, background?: string): string {
     const parts: string[] = [];
     if (name) parts.push(`正在和你对话的用户叫「${name}」`);
@@ -103,19 +104,43 @@ export class DiscussionEngineService {
     return parts.length ? parts.join('。') + '。' : '';
   }
 
+  // ── Content cleaning ────────────────────────────────────────────
+
   /**
-   * Ask the character's own LLM whether it needs to search the web.
-   * Returns a search query string, or null if search is unnecessary.
+   * Strip any "name："/"name:"/"[name]：" prefix that the LLM may have
+   * prepended to its own response. We do this BEFORE storing and before
+   * pushing to context, so the stored data is always clean.
+   *
+   * The UI already displays {senderName} separately — a redundant prefix
+   * in the content body would cause double-attribution.
    */
+  private stripNamePrefix(content: string, ownName: string): string {
+    let cleaned = content;
+
+    // 1. Strip "[ownName]：" or "ownName：" at the very beginning
+    const escaped = ownName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    cleaned = cleaned
+      .replace(new RegExp(`^\\[?${escaped}\\]?[：:]\\s*`), '')
+      .trim();
+
+    // 2. Strip any other "[name]：" or "name：" pattern at the beginning
+    //    (LLM sometimes uses the user's name or gets confused)
+    cleaned = cleaned
+      .replace(/^\[.+?\][：:]\s*/, '')
+      .replace(/^[一-鿿\w]{1,12}[：:]\s*/, '')
+      .trim();
+
+    return cleaned || content; // never return empty string
+  }
+
+  // ── Search decision (unchanged) ──────────────────────────────────
+
   private async decideSearchForCharacter(
     character: { name: string; personality: string; model: { provider: string; model: string } },
     userContent: string,
     userInfo: string
   ): Promise<string | null> {
-    // Fast-path keyword check: skip LLM call for obviously non-search queries
-    if (!this.hasSearchHint(userContent)) {
-      return null;
-    }
+    if (!this.hasSearchHint(userContent)) return null;
 
     const decisionPrompt = `你是 ${character.name}。${userInfo ? userInfo + '。' : ''}${character.personality ? `性格：${character.personality}。` : ''}
 
@@ -140,7 +165,6 @@ export class DiscussionEngineService {
         console.info(`[DiscussionEngine] ${character.name} 决定搜索: "${query}"`);
         return query;
       }
-
       console.info(`[DiscussionEngine] ${character.name} 决定不搜索`);
       return null;
     } catch {
@@ -149,9 +173,6 @@ export class DiscussionEngineService {
     }
   }
 
-  /**
-   * Fast keyword check to avoid unnecessary LLM calls for search decisions.
-   */
   private hasSearchHint(content: string): boolean {
     const triggers = [
       '搜索', '查一下', '查查', '搜一下', '帮我查',
@@ -163,21 +184,19 @@ export class DiscussionEngineService {
     return triggers.some(t => lower.includes(t));
   }
 
-  /**
-   * Run one sequential round of character responses.
-   *
-   * Returns `{ searchHappened: true }` if a character searched the web
-   * and presented results — the caller should stop further rounds to
-   * avoid other characters interrupting the search presentation.
-   */
-  private async runSequentialRound(
+  // ══════════════════════════════════════════════════════════════════
+  //  Core: run one conversation round
+  // ══════════════════════════════════════════════════════════════════
+
+  private async runConversationRound(
     speakers: string[],
     otherNames: string[],
     context: Array<{ role: Role; content: string; speakerName?: string }>,
     round: number,
     userContent: string | undefined,
     userInfo: string,
-    roomId: string
+    roomId: string,
+    userName?: string
   ): Promise<{ searchHappened: boolean }> {
     for (const speakerId of speakers) {
       const character = this.characterStore.getCharacter(speakerId);
@@ -185,8 +204,9 @@ export class DiscussionEngineService {
 
       const peers = otherNames.filter((n) => n !== character.name);
       const positionIndex = speakers.indexOf(speakerId);
+      const userDisplayName = userName || '用户';
 
-      // ── Round 0: Character decides if they need web search ─────
+      // ── Search (round 0 only) ──────────────────────────────────
       let searchContext = '';
       let didSearch = false;
       if (round === 0 && userContent) {
@@ -198,58 +218,54 @@ export class DiscussionEngineService {
         if (searchQuery) {
           const result = await this.webSearchService.search(roomId, searchQuery);
           if (result.formatted) {
-            // Strong directive: character MUST present the search results to the user
             searchContext = `\n\n重要：你刚才在网上搜索了「${searchQuery}」，以下是搜索结果。请务必将你查到的关键信息完整地告诉用户，不要只说"我查到了"，而要具体说出查到的内容。可以自然地提及来源：\n${result.formatted}`;
             didSearch = true;
           }
         }
       }
 
-      // ── Build system prompt ──────────────────────────────────────
-      // Include message format instructions so the character can clearly
-      // distinguish its own words from those of other characters.
-      const formatHint = `\n\n【消息格式说明】对话历史中：\n- 标注"用户 说："的是用户（真人）的发言\n- 标注"某某 说："的是其他角色的发言\n- 没有标注前缀、直接放在 assistant 角色位置的是你自己之前说过的话\n请据此区分：不要重复别人的观点当作自己的，也不要否认自己刚说过的话。`;
+      // ── Build system prompt ────────────────────────────────────
+      // Frame it as a real group chat, NOT a script or performance.
 
+      // 1. Build a readable chat transcript of recent context
+      const transcript = this.buildTranscript(context, character.name, userDisplayName, 10);
+
+      // 2. Build system prompt based on round
       let systemMsg: string;
       if (round === 0) {
-        if (positionIndex === 0) {
-          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。请自然回应。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
-        } else {
-          const prevNames = speakers.slice(0, positionIndex)
-            .map((id) => this.characterStore.getCharacter(id)?.name).filter(Boolean).join('、');
-          systemMsg = `你是 ${character.name}。${userInfo}用户说：「${userContent || ''}」。${prevNames} 已回应（见上文）。请自然接话。${searchContext}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
-        }
+        systemMsg = this.buildRound0Prompt(
+          character.name, character.personality, userInfo, userContent,
+          userDisplayName, peers, positionIndex, speakers, transcript, searchContext
+        );
       } else {
-        systemMsg = `你是 ${character.name}。你正在跟 ${peers.join('、')} 聊天。自然交流，像朋友一样。${round === 1 ? '刚聊起来，放轻松。' : '别重复老话题。'}${character.personality ? `\n性格：${character.personality}` : ''}${formatHint}`;
+        systemMsg = this.buildAiRoundPrompt(
+          character.name, character.personality, peers, round, transcript
+        );
       }
 
-      // Build messages with clear attribution so each character
-      // can tell which messages are its own vs. from others.
-      //
-      // Rules:
-      //  - Own past messages   → role: 'assistant' (native LLM self-recognition)
-      //  - Other speakers      → role: 'user'     prefixed with "角色名 说："
-      //  - Human user messages → role: 'user'     prefixed with "用户 说："
-      //  - System messages     → role: 'system'   (via systemMsg)
+      // ── Build messages for the LLM ─────────────────────────────
+      // Roles:
+      //  - Current character's own past messages → assistant (native self-recognition)
+      //  - Other characters' messages → user with name label
+      //  - Human user messages → user with label
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
         ...context.map((m) => {
           const isOwn = m.speakerName === character.name;
-          const isUser = !m.speakerName; // user messages have no speakerName
+          const isHuman = !m.speakerName;
 
           if (isOwn) {
-            // Use 'assistant' role so the LLM naturally recognises these as its own output
+            // Own message → assistant role, no extra label needed
             return { role: 'assistant' as Role, content: m.content };
           }
-          if (isUser) {
-            return { role: 'user' as Role, content: `用户 说：${m.content}` };
+          if (isHuman) {
+            return { role: 'user' as Role, content: `${userDisplayName}：${m.content}` };
           }
-          // Another character's message
-          return { role: 'user' as Role, content: `${m.speakerName} 说：${m.content}` };
+          return { role: 'user' as Role, content: `${m.speakerName}：${m.content}` };
         })
       ];
 
-      // ── Call model ──────────────────────────────────────────
+      // ── Call model ─────────────────────────────────────────────
       const messageId = this.chatStore.beginStreamingMessage(roomId, character.id);
       let fullContent = '';
 
@@ -265,9 +281,16 @@ export class DiscussionEngineService {
           this.chatStore.appendStreamChunk(messageId, chunk);
         }
 
+        // ── Clean: strip any "name：" prefix the LLM may have added ──
+        // This ensures stored content is clean and consistent with the
+        // UI (which already shows senderName separately).
+        fullContent = this.stripNamePrefix(fullContent, character.name);
+
         if (isTrivial(fullContent)) {
           console.info(`[DiscussionEngine] ${character.name} 沉默（内容过短）`);
         } else {
+          // Replace store content with cleaned version before persisting
+          this.chatStore.setStreamingContent(messageId, fullContent);
           this.chatStore.finalizeStreamedMessage(messageId);
         }
       } catch (err) {
@@ -275,16 +298,13 @@ export class DiscussionEngineService {
         this.chatStore.finalizeStreamedMessage(messageId);
       }
 
-      // Push to context for subsequent speakers
+      // Push cleaned content to context for subsequent speakers
       context.push({
         role: 'assistant' as Role,
         speakerName: character.name,
         content: fullContent
       });
 
-      // ── If this character searched and presented results, ─────
-      // STOP immediately. No more characters this round.
-      // This ensures the search presentation is not interrupted.
       if (didSearch && !isTrivial(fullContent)) {
         console.info(`[DiscussionEngine] ${character.name} 已展示搜索结果，停止本轮后续角色`);
         return { searchHappened: true };
@@ -292,5 +312,116 @@ export class DiscussionEngineService {
     }
 
     return { searchHappened: false };
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  Prompt builders
+  // ══════════════════════════════════════════════════════════════════
+
+  /**
+   * Build a readable chat transcript for the system prompt.
+   * Every message is clearly labeled with who sent it.
+   */
+  private buildTranscript(
+    context: Array<{ content: string; speakerName?: string }>,
+    currentCharName: string,
+    userDisplayName: string,
+    maxEntries: number
+  ): string {
+    const recent = context.slice(-maxEntries);
+    if (!recent.length) return '（暂无聊天记录）';
+
+    return recent
+      .map((m) => {
+        if (!m.speakerName) {
+          // Human user
+          return `${userDisplayName}：${m.content}`;
+        }
+        if (m.speakerName === currentCharName) {
+          // This character's own message
+          return `你（${currentCharName}）：${m.content}`;
+        }
+        // Another AI character
+        return `${m.speakerName}：${m.content}`;
+      })
+      .join('\n');
+  }
+
+  /**
+   * Round 0: character responds to the user's message.
+   */
+  private buildRound0Prompt(
+    name: string,
+    personality: string,
+    userInfo: string,
+    userContent: string | undefined,
+    userDisplayName: string,
+    peers: string[],
+    positionIndex: number,
+    speakers: string[],
+    transcript: string,
+    searchContext: string
+  ): string {
+    const personalityLine = personality ? `\n你的性格特点：${personality}` : '';
+    const userLine = userContent ? `\n${userDisplayName}刚说：「${userContent}」` : '';
+
+    let prompt = `你叫「${name}」，你正在一个群聊中。${userDisplayName}是真人用户，其他人是AI角色。${personalityLine}${userLine}`;
+
+    if (positionIndex > 0) {
+      const prevSpeakers = speakers.slice(0, positionIndex)
+        .map((id) => this.characterStore.getCharacter(id)?.name).filter(Boolean);
+      if (prevSpeakers.length) {
+        prompt += `\n在你之前，${prevSpeakers.join('、')} 已经回应了（见下方聊天记录）。`;
+      }
+    }
+
+    prompt += `\n\n=== 聊天记录 ===
+${transcript}
+=== 记录结束 ===
+
+现在轮到你了。请像真人聊天一样自然地回应。注意：
+- 你是谁？你是「${name}」，不是别人。下方记录中标注「你（${name}）：」的才是你之前说过的话
+- 不要重复别人已经说过的观点，除非你要表示赞同或反对
+- 如果你在记录中看到自己已经回应过了，就说点新的，不要再说一遍${searchContext}
+
+请直接说话，不要加「${name}：」之类的前缀。`;
+
+    return prompt;
+  }
+
+  /**
+   * Round 1-5: AI-to-AI free conversation.
+   */
+  private buildAiRoundPrompt(
+    name: string,
+    personality: string,
+    peers: string[],
+    round: number,
+    transcript: string
+  ): string {
+    const personalityLine = personality ? `\n你的性格：${personality}` : '';
+    const peerList = peers.length ? peers.join('、') : '其他人';
+
+    const roundHint = round === 1
+      ? '刚刚聊起来，放轻松，像朋友群聊一样。'
+      : round >= 4
+        ? '聊了一阵了。如果话题聊干了可以自然地换个新话题，或者沉默也没关系。'
+        : '继续自然聊天。';
+
+    return `你在一个群聊中，房间里还有：${peerList}。${personalityLine}
+
+${roundHint}
+
+=== 聊天记录 ===
+${transcript}
+=== 记录结束 ===
+
+现在轮到你了。要点：
+- 你叫「${name}」。标注「你（${name}）：」的才是你自己说过的话
+- 像真人一样聊天：可以接话、提问、反驳、开玩笑、分享想法
+- 如果你没什么想说的，可以简单回应或换话题
+- 不要像写剧本一样说话，要像真实聊天
+
+请直接说话，不要加「${name}：」之类的前缀。`;
   }
 }

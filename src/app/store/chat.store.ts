@@ -78,6 +78,16 @@ export class ChatStore {
   }
 
   /**
+   * Replace a streaming message's content entirely (used for post-processing
+   * such as stripping name prefixes before persistence).
+   */
+  setStreamingContent(messageId: string, content: string): void {
+    this.messagesSignal.update((messages) =>
+      messages.map((m) => (m.id === messageId ? { ...m, content } : m))
+    );
+  }
+
+  /**
    * Finalize a streaming message — persist it to localStorage.
    */
   finalizeStreamedMessage(messageId: string): void {
