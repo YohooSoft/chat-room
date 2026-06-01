@@ -244,10 +244,13 @@ export class DiscussionEngineService {
       }
 
       // ── Build messages for the LLM ─────────────────────────────
-      // Roles:
-      //  - Current character's own past messages → assistant (native self-recognition)
-      //  - Other characters' messages → user with name label
-      //  - Human user messages → user with label
+      // CRITICAL: the LLM must distinguish THREE kinds of messages:
+      //  【真人用户】— the actual human being. This is who you respond TO.
+      //  【群友】    — other AI characters. They are peers, NOT the user.
+      //  assistant  — your own past messages (native self-recognition).
+      //
+      // All non-self messages use role='user' (API constraint), but the
+      // 【真人用户】/【群友】 tags make the distinction unmistakable.
       const messages: Array<{ role: Role; content: string }> = [
         { role: 'system', content: systemMsg },
         ...context.map((m) => {
@@ -255,13 +258,12 @@ export class DiscussionEngineService {
           const isHuman = !m.speakerName;
 
           if (isOwn) {
-            // Own message → assistant role, no extra label needed
             return { role: 'assistant' as Role, content: m.content };
           }
           if (isHuman) {
-            return { role: 'user' as Role, content: `${userDisplayName}：${m.content}` };
+            return { role: 'user' as Role, content: `【真人用户】${userDisplayName}：${m.content}` };
           }
-          return { role: 'user' as Role, content: `${m.speakerName}：${m.content}` };
+          return { role: 'user' as Role, content: `【群友】${m.speakerName}：${m.content}` };
         })
       ];
 
@@ -320,7 +322,8 @@ export class DiscussionEngineService {
 
   /**
    * Build a readable chat transcript for the system prompt.
-   * Every message is clearly labeled with who sent it.
+   * Uses 【真人用户】/【群友】 markers so the character can
+   * instantly see who is the human vs who is another AI.
    */
   private buildTranscript(
     context: Array<{ content: string; speakerName?: string }>,
@@ -334,15 +337,15 @@ export class DiscussionEngineService {
     return recent
       .map((m) => {
         if (!m.speakerName) {
-          // Human user
-          return `${userDisplayName}：${m.content}`;
+          // Human user — this is who you primarily respond to
+          return `【真人用户】${userDisplayName}：${m.content}`;
         }
         if (m.speakerName === currentCharName) {
-          // This character's own message
+          // Your own past messages
           return `你（${currentCharName}）：${m.content}`;
         }
-        // Another AI character
-        return `${m.speakerName}：${m.content}`;
+        // Another AI — a peer, NOT the user
+        return `【群友】${m.speakerName}：${m.content}`;
       })
       .join('\n');
   }
@@ -365,7 +368,16 @@ export class DiscussionEngineService {
     const personalityLine = personality ? `\n你的性格特点：${personality}` : '';
     const userLine = userContent ? `\n${userDisplayName}刚说：「${userContent}」` : '';
 
-    let prompt = `你叫「${name}」，你正在一个群聊中。${userDisplayName}是真人用户，其他人是AI角色。${personalityLine}${userLine}`;
+    let prompt = `你叫「${name}」，你正在一个群聊中。
+
+【如何看懂对话记录】
+- 标注「【真人用户】」的 → 这是群聊里唯一的真人，你应该主要回应TA
+- 标注「【群友】」的 → 这是其他AI角色，和你一样是群聊参与者，TA们不是真人用户
+- 标注「你（${name}）：」的 → 这是你自己之前说过的话
+- 放在 assistant 位置但没有前缀的 → 也是你自己之前说过的话
+请务必区分清楚：不要把其他群友说的话当成真人用户的话！
+
+${userInfo ? userInfo + '\n' : ''}${personalityLine}${userLine}`;
 
     if (positionIndex > 0) {
       const prevSpeakers = speakers.slice(0, positionIndex)
@@ -380,11 +392,10 @@ ${transcript}
 === 记录结束 ===
 
 现在轮到你了。请像真人聊天一样自然地回应。注意：
-- 你是谁？你是「${name}」，不是别人。下方记录中标注「你（${name}）：」的才是你之前说过的话
 - 不要重复别人已经说过的观点，除非你要表示赞同或反对
 - 如果你在记录中看到自己已经回应过了，就说点新的，不要再说一遍${searchContext}
 
-请直接说话，不要加「${name}：」之类的前缀。`;
+请直接说话，不要加任何前缀。`;
 
     return prompt;
   }
@@ -410,18 +421,21 @@ ${transcript}
 
     return `你在一个群聊中，房间里还有：${peerList}。${personalityLine}
 
+【如何看懂对话记录】
+- 标注「【真人用户】」的 → 群聊里唯一的真人，TA说的话优先级最高
+- 标注「【群友】」的 → 其他AI角色，和你一样是参与者，不是真人
+- 标注「你（${name}）：」的 → 你自己之前说过的话
+- 放在 assistant 位置但没有前缀的 → 也是你自己说过的话
+记住：不要把群友说的话当成了真人用户的话！
+
 ${roundHint}
 
 === 聊天记录 ===
 ${transcript}
 === 记录结束 ===
 
-现在轮到你了。要点：
-- 你叫「${name}」。标注「你（${name}）：」的才是你自己说过的话
-- 像真人一样聊天：可以接话、提问、反驳、开玩笑、分享想法
-- 如果你没什么想说的，可以简单回应或换话题
-- 不要像写剧本一样说话，要像真实聊天
+现在轮到你了。像真人一样聊天：可以接话、提问、反驳、开玩笑、分享想法。如果你没什么想说的，可以简单回应或换话题。不要像写剧本一样说话。
 
-请直接说话，不要加「${name}：」之类的前缀。`;
+请直接说话，不要加任何前缀。`;
   }
 }
